@@ -1,4 +1,3 @@
-
  <p align="center">
 
   <img height="300"  src="./mockups/iphone.png"/>
@@ -36,6 +35,7 @@
 
 ## 💡 Архитектура и стек
 
+- В процессе разработки принципиально не применялись AI-инструменты
 - Строгая типизация: TypeScript строгий режим в `tsconfig.*` (noUnused, noFallthrough и др.)
 - Единый стиль кода: ESLint flat config (с `@typescript-eslint` и `import`), Prettier, Stylelint для SCSS
 - Архитектура фронтенда: Vue 3 Composition API + Pinia (персист через `pinia-plugin-persistedstate`), типизированные сторы
@@ -51,8 +51,6 @@
 - API эндпоинты: `POST /auth/register`, `POST /auth/login`; защищённые `GET|PATCH /users/me/calorie-limit` (JWT Guard)
 - Конфигурация и окружения: переменные `.env` (`DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_ACCESS_EXPIRES`), генерация `.env` из `.env.example` (`npm run genEnv`)
 - Процессы и деплой: PM2 (`ecosystem.config.js`), разделение env для dev/prod, zero‑downtime рестарты; `start:prod` на `dist/main.js`
-
-
 
 ## 📝 Licence
 

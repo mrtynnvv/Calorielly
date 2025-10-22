@@ -17,6 +17,12 @@
           v-model.number="ccalValue"
           type="number"
         />
+        <div class="nameInput">Вес</div>
+        <UiInput
+          placeholder="Введите количество грамм"
+          v-model.number="grValue"
+          type="number"
+        />
         <div class="nameInput">Название</div>
         <UiInput
           placeholder="Введите название продукта"
@@ -48,99 +54,53 @@ import { ref } from 'vue'
 
 import UiButton from '@/components/ui/UiButton.vue'
 import UiInput from '@/components/ui/UiInput.vue'
-// @ts-ignore
-import { useLogin } from '@/store/Login'
-const loginStore = useLogin()
+import { useUser } from '@/store/User'
+const userStore = useUser()
+const API_BASE = import.meta.env.VITE_API_BASE
 defineProps<{ open: boolean }>()
 const emit = defineEmits(['close'])
-const ccalValue = ref('')
+const ccalValue = ref(null)
 const ccalName = ref('')
+const grValue = ref(null)
 
-const weightValue = ref('')
-function addWeight() {
-  if (loginStore.id !== 1) {
-    axios
-      .get(`https://dexone.pw/backend_new/data/${loginStore.id}`)
-      .then((res) => {
-        let weightList = res.data.weightList
-
-        let dateToday =
-          new Date().getDate() +
-          '.' +
-          (new Date().getMonth() + 1) +
-          '.' +
-          new Date().getFullYear() //создание нового дня если последний вчерашний
-        weightList = Array.isArray(loginStore.weightList)
-          ? loginStore.weightList
-          : []
-        const firstWeight = weightList
-        if (
-          firstWeight &&
-          firstWeight[0] !== dateToday &&
-          loginStore.id !== 1
-        ) {
-          weightList.unshift([dateToday, 0])
-        }
-
-        weightList[0][1] = Number(weightValue.value)
-        console.log(weightValue.value)
-        axios
-          .patch(`https://dexone.pw/backend_new/data/${loginStore.id}`, {
-            weightList: weightList,
-          })
-          .then(() => {
-            loginStore.getInfo()
-            weightValue.value = ''
-          })
-      })
-  } else {
-    alert('Вам необходимо создать аккаунт')
+async function addCcal() {
+  try {
+    const { data } = await axios.post(
+      `${API_BASE}/users/me/foods`,
+      {
+        title: ccalName.value,
+        calories: ccalValue.value,
+        grams: grValue.value,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${userStore.token}`,
+        },
+      },
+    )
+    console.log(data)
+  } catch (e) {
+    console.log(e)
   }
 }
 
-function addCcal() {
-  if (loginStore.id !== 1) {
-    axios
-      .get(`https://dexone.pw/backend_new/data/${loginStore.id}`)
-      .then((res) => {
-        let eatingList = res.data.eatingList
-
-        let dateToday =
-          new Date().getDate() +
-          '.' +
-          (new Date().getMonth() + 1) +
-          '.' +
-          new Date().getFullYear() //создание нового дня если последний вчерашний
-        eatingList = Array.isArray(loginStore.eatingList)
-          ? loginStore.eatingList
-          : []
-        const firstEating = eatingList[0]
-        if (
-          firstEating &&
-          firstEating[0] !== dateToday &&
-          loginStore.id !== 1
-        ) {
-          eatingList.unshift([dateToday, [], [], []])
-        }
-
-        eatingList[0][1].push(
-          String(new Date(Date.now())).slice(15).slice(1, 6),
-        )
-        eatingList[0][2].push(ccalValue.value)
-        eatingList[0][3].push(ccalName.value)
-
-        axios
-          .patch(`https://dexone.pw/backend_new/data/${loginStore.id}`, {
-            eatingList: eatingList,
-          })
-          .then(() => {
-            loginStore.getInfo()
-            ccalName.value = ''
-            ccalValue.value = ''
-          })
-      })
-  } else {
-    alert('Вам необходимо создать аккаунт')
+const weightValue = ref(null)
+async function addWeight() {
+  try {
+    const { data } = await axios.post(
+      `${API_BASE}/users/me/weights`,
+      {
+        weight: weightValue.value,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${userStore.token}`,
+        },
+      },
+    )
+    console.log(data)
+  } catch (e) {
+    console.log(e)
   }
 }
 </script>

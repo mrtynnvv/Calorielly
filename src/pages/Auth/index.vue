@@ -1,9 +1,6 @@
 <template>
   <div class="main">
     <UiBlock class="ui-block">
-      <a class="back" v-if="payload?.id" @click="goBack"
-        ><img src="@/assets/Auth/back.svg"
-      /></a>
       <img src="@/assets/logo.svg" />
       <p class="t-title-XL">
         <a v-if="steps === 'enter'">Вход</a> <a v-else>Регистрация</a> в
@@ -20,161 +17,39 @@
       </div>
 
       <EnterStep1 v-if="steps === 'enter'" />
-      <!-- номер телефона -->
       <RegisterStep1
         v-if="steps === 'reg1'"
-        @send-value="updateLoginId"
-        @change-step="steps = $event as Step"
+        @send-value="login = $event"
+        @change-step="onChangeStep"
       />
-      <!-- пароль -->
       <RegisterStep2
         v-if="steps === 'reg2'"
-        @change-step="steps = $event as Step"
-        @send-password="updatePassword"
-      />
-      <!-- текущий вес -->
-      <RegisterStep3
-        v-if="steps === 'reg3'"
-        @change-step="steps = $event as Step"
-        @send-weightList="updateWeightList"
-      />
-      <!-- текущий вес -->
-      <RegisterStep4
-        v-if="steps === 'reg4'"
-        @change-step="steps = $event as Step"
-        @send-desiredWeight="updateDesiredWeight"
-      />
-      <!-- лимит калорий -->
-      <RegisterStep5
-        v-if="steps === 'reg5'"
-        @start-reg="registration"
-        @send-limitCcal="updateLimitCcal"
+        :login="login"
+        @change-step="onChangeStep"
       />
     </UiBlock>
   </div>
-  {{ payload }}
-  {{ steps }}
 </template>
 
 <script setup lang="ts">
-import axios from 'axios'
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 
 import EnterStep1 from './components/EnterStep1.vue'
 import RegisterStep1 from './components/RegisterStep1.vue'
 import RegisterStep2 from './components/RegisterStep2.vue'
-import RegisterStep3 from './components/RegisterStep3.vue'
-import RegisterStep4 from './components/RegisterStep4.vue'
-import RegisterStep5 from './components/RegisterStep5.vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
-import { useLogin } from '@/store/Login'
-const router = useRouter()
-const loginStore = useLogin()
 
-type ValuePayload = {
-  id?: number
-  login?: string
-  password?: string
-  weightList?: [[string, number]]
-  desiredWeight?: number
-  limitCcal?: number
-}
-const payload = ref<ValuePayload | null>(null)
+const login = ref<string>('')
 
-type Step = 'reg1' | 'reg2' | 'reg3' | 'reg4' | 'reg5' | 'enter'
+type Step = 'reg1' | 'reg2' | 'enter'
 const steps = ref<Step>('reg1')
 const switchAuth = () => {
-  if (steps.value === 'reg1') {
-    console.log(steps.value)
-    steps.value = 'enter'
-    console.log(steps.value)
-  } else if (steps.value === 'enter') {
-    steps.value = 'reg1'
-  }
+  steps.value === 'reg1' ? (steps.value = 'enter') : (steps.value = 'reg1')
 }
 
-const fieldByStep = {
-  reg2: ['id', 'login', 'password'],
-  reg3: ['password', 'weightList'],
-  reg4: ['weightList', 'desiredWeight'],
-  reg5: ['desiredWeight', 'limitCcal'],
-} as const satisfies Partial<Record<Step, readonly (keyof ValuePayload)[]>> //какие поля очищаем при уходе назад с соответствующего шага
-const prevByStep = {
-  reg2: 'reg1',
-  reg3: 'reg2',
-  reg4: 'reg3',
-  reg5: 'reg4',
-} as const satisfies Partial<Record<Step, Step>> //на какой шаг возвращаемся при уходе с соответсвующего шага
-const goBack = () => {
-  const keys =
-    (fieldByStep as Record<string, ReadonlyArray<keyof ValuePayload>>)[
-      steps.value
-    ] ?? []
-  if (!payload.value) return
-  for (const k of keys) {
-    delete (payload.value as Record<keyof ValuePayload, unknown>)[k]
-  }
-  const prev = (prevByStep as Record<string, Step>)[steps.value]
-  steps.value = prev ?? steps.value //установка шага
-}
-
-const updateLoginId = ([id, login]: [number, string]) => {
-  //добавляет в payload id и логин
-  payload.value = { id, login }
-}
-
-const updatePassword = (password: string) => {
-  //добавляет в payload пароль и вызывает функцию регистрации
-  if (payload.value) {
-    payload.value.password = password
-  }
-}
-
-const updateWeightList = (weightList: [string, number]) => {
-  //добавляет в payload первую запись списка веса
-  if (payload.value) {
-    payload.value.weightList = [weightList]
-  }
-}
-
-const updateDesiredWeight = (desiredWeight: number) => {
-  //добавляет в payload желаемый вес
-  if (payload.value) {
-    payload.value.desiredWeight = desiredWeight
-  }
-}
-
-const updateLimitCcal = (limitCcal: number) => {
-  if (payload.value) {
-    payload.value.limitCcal = limitCcal
-  }
-}
-
-const registration = () => {
-  //если логин не найден в бд допускается регистрация
-  axios.post(`https://dexone.pw/backend_new/users`, {
-    id: payload.value?.id,
-    login: payload.value?.login,
-    password: payload.value?.password,
-  }) //создание пользователя
-  axios
-    .post('https://dexone.pw/backend_new/data', {
-      id: payload.value?.id,
-      limitCcal: payload.value?.limitCcal,
-      desiredWeight: payload.value?.desiredWeight,
-      eatingList: [['0', [], [], []]],
-      weightList: payload.value?.weightList,
-    })
-    .then(() => {
-      loginStore.id = payload.value?.id ?? 1 //авторизация пользователя
-      loginStore.getInfo()
-      router.push('/profile')
-    })
-    .catch((err) => {
-      console.error(err)
-    })
+const onChangeStep = (s: Step | string) => {
+  steps.value = s as Step
 }
 </script>
 

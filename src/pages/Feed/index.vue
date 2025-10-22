@@ -17,9 +17,5 @@ import Now from './components/Now.vue'
 import Target from './components/Target.vue'
 import TimeLine from './components/TimeLine.vue'
 
-import { useLogin } from '@/store/Login'
-
-const loginStore = useLogin()
 const emit = defineEmits(['open'])
-loginStore.getInfo()
 </script>

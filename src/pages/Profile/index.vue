@@ -7,8 +7,6 @@
 <script setup lang="ts">
 import AccountInfo from './components/AccountInfo.vue'
 
-// @ts-ignore
-
 defineProps({
   msg: String,
 })

@@ -22,9 +22,10 @@ import { useRouter } from 'vue-router'
 
 import UiButton from '@/components/ui/UiButton.vue'
 import UiInput from '@/components/ui/UiInput.vue'
-import { useLogin } from '@/store/Login'
+import { useUser } from '@/store/User'
+const API_BASE = import.meta.env.VITE_API_BASE
+const userStore = useUser()
 const router = useRouter()
-const loginStore = useLogin()
 
 const login = ref('+7')
 const password = ref('')
@@ -35,25 +36,25 @@ function openPasswordInput() {
     showPasswordInput.value = true
   }
 }
-function enter() {
-  axios.get(`https://dexone.pw/backend_new/users`).then((res) => {
-    let logins = []
-    let passwords = []
-    for (let i = 0; i < res.data.length; i++) {
-      logins.push(res.data[i].login) //массив логинов в дб
-      passwords.push(res.data[i].password) //массив паролей в дб
-    }
-
-    let search = logins.indexOf(login.value) //возврат индекса введенного логина в базе данных или -1 если нет
-    if (search > 0 && res.data[search].password == password.value) {
-      //если найден логин и пароль по этому индексу равен введенному value то
-      loginStore.id = res.data[search].id //задается id пользователя в сторе
-      loginStore.getInfo()
-      router.push('/profile')
-    } else {
-      alert('Неверный логин или пароль')
-    }
-  })
+async function enter() {
+  try {
+    const { data } = await axios.post(
+      `${API_BASE}/auth/login`,
+      {
+        phone: login.value,
+        password: password.value,
+      },
+      {
+        headers: {
+          'Content-type': 'application/json',
+        },
+      },
+    )
+    userStore.token = data.accessToken
+    router.push('/feed')
+  } catch (e) {
+    console.log(e)
+  }
 }
 </script>
 

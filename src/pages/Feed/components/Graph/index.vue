@@ -5,49 +5,46 @@
     </div>
 
     <div class="content">
-      <Chart :data="data" class="chart" />
+      <Chart :data="dataList" class="chart" />
     </div>
   </UiBlock>
 </template>
 
 <script setup lang="ts">
-import { watch, ref } from 'vue'
+import axios from 'axios'
+import { ref } from 'vue'
 
 import Chart from './Chart.vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
-import { useLogin } from '@/store/Login'
+import { useUser } from '@/store/User'
+const userStore = useUser()
+const API_BASE = import.meta.env.VITE_API_BASE
 
-const loginStore = useLogin()
+const dataList = ref<[number[], string[]]>([[], []]) //веса[0] и даты [1] в графике
+async function getWeights() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/users/me/weights`, {
+      headers: {
+        Authorization: `Bearer ${userStore.token}`,
+      },
+    })
 
-const data = ref<[number[], string[]]>([[], []]) //веса[0] и даты [1] в графике
-
-function updateData() {
-  if (loginStore.weightList !== 'loading') {
-    const list: [string, string | number][] = Array.isArray(
-      loginStore.weightList,
-    )
-      ? loginStore.weightList.map(([x, y]) => [String(x), y])
-      : []
-    data.value[0] = list.reduce<number[]>((accumulator, item) => {
-      accumulator.unshift(Number(item[1]))
-      return accumulator
-    }, [])
-
-    data.value[1] = list.reduce<string[]>((accumulator, item) => {
-      accumulator.unshift(item[0])
-      return accumulator
-    }, [])
-    if (data.value[0][0] === 0) {
-      data.value[0].splice(0, 1)
-      data.value[1].splice(0, 1)
-    }
+    dataList.value[0] = (data.items as Array<{ weight: number | string }>).map(
+      (i) => Number(i.weight),
+    ) //пуш значений веса
+    dataList.value[1] = (data.items as Array<{ measuredAt: string }>).map((i) =>
+      new Date(i.measuredAt).toLocaleString('ru-RU', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }),
+    ) //пуш дат
+  } catch (e) {
+    console.log(e)
   }
 }
 
-watch(loginStore, () => {
-  updateData()
-})
+getWeights()
 </script>
 
 <style scoped lang="scss">

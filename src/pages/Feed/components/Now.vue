@@ -8,7 +8,7 @@
           <img src="@/assets/Feed/fire.svg" />
         </div>
         <div class="text">
-          <p class="t-main">{{ sumCcalToday }} ккал</p>
+          <p class="t-main">{{ ccalToday }} ккал</p>
           <p class="t-comment">обновлено {{ backTime }} мин назад</p>
         </div>
       </div>
@@ -20,11 +20,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import axios from 'axios'
+import { ref } from 'vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
-import { useLogin } from '@/store/Login'
-const loginStore = useLogin()
+import { useUser } from '@/store/User'
+const API_BASE = import.meta.env.VITE_API_BASE
+const userStore = useUser()
+
 const emit = defineEmits(['open'])
 
 const backTime = ref('')
@@ -33,24 +36,39 @@ setInterval(() => updateTime(), 60000) //обновлено ... мин наза�
 function updateTime() {
   backTime.value = ((Date.now() - upTime.value) / 1000 / 60).toFixed()
 }
-watch(loginStore, () => {
-  upTime.value = Date.now()
-  updateTime()
-})
-
 defineProps({
   msg: String,
 })
 
-const sumCcalToday = computed(() => {
-  if (loginStore.eatingList !== 'loading') {
-    const calories = loginStore.eatingList?.[0]?.[2] ?? []
-    return Array.isArray(calories)
-      ? calories.reduce((acc, n) => acc + Number(n), 0)
-      : 0
+const ccalToday = ref(0)
+async function getCcalToday() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/users/me/foods`, {
+      headers: {
+        Authorization: `Bearer ${userStore.token}`,
+      },
+    })
+    //выводит записи приемов пищи только за сегодня (границы дня по часовому поясу устройства)
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    const end = new Date()
+    end.setHours(23, 59, 59, 999)
+    const todayItems = data.filter((i: any) => {
+      const d = new Date(i.eatenAt)
+      return d >= start && d <= end
+    })
+    //выводит сумму калорий за сегодня (чп аналогично)
+    ccalToday.value = todayItems.reduce(
+      (s: any, i: any) => s + Number(i.calories),
+      0,
+    )
+    upTime.value = Date.now()
+    updateTime()
+  } catch (e) {
+    console.log(e)
   }
-  return 0
-})
+}
+getCcalToday()
 </script>
 
 <style scoped lang="scss">

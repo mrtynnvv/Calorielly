@@ -24,7 +24,7 @@
       <div class="section">
         <img src="@/assets/LeftBar/settings.svg"></img>
 
-        <span>Цели</span>
+        <span>Настройки</span>
       </div>
     </RouterLink>
     <RouterLink to="/profile">

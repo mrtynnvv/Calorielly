@@ -1,8 +1,8 @@
 <template>
   <UiBlock class="ui-block">
     <div class="header">
-      <a class="t-title">Калорий сегодня</a>
-      <div class="daySelector">
+      <a class="t-title">События сегодня</a>
+      <!-- <div class="daySelector">
         <a
           class="selectorBack"
           @click="
@@ -30,84 +30,74 @@
         >
           <img class="back" src="@/assets/Feed/arrow-right.svg"
         /></a>
-      </div>
+      </div> -->
     </div>
-    <div
-      v-for="(_, index) in day ? day[1] : []"
-      class="content"
-      @click="$emit('open')"
-    >
+    <div v-for="eat in eatingList" class="content" @click="$emit('open')">
       <div class="leftBlock">
         <div class="icon">
           <img src="@/assets/Feed/pizza.svg" />
         </div>
         <div class="text">
           <p class="t-main">
-            {{ day ? day[3][day[3].length - 1 - index] : '' }}
-            <a>{{ day ? day[2][day[2].length - 1 - index] : '' }} ккал</a>
+            {{ eat.title }}
+            <a>{{ eat.calories }} ккал</a>
           </p>
           <p class="t-comment">
-            {{ day ? day[1][day[1].length - 1 - index] : '' }}
+            {{
+              new Date(eat.eatenAt).toLocaleTimeString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            }}
           </p>
         </div>
       </div>
-      <div
+      <!-- <div
         class="rightBlock"
         @click="day && deleteCcalValue(day[2].length - 1 - index)"
       >
         <img src="@/assets/close-gray.svg" />
-      </div>
+      </div> -->
     </div>
   </UiBlock>
 </template>
 
 <script setup lang="ts">
 import axios from 'axios'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
-import { useLogin } from '@/store/Login'
-
-const loginStore = useLogin()
-
-const daySelector = ref(0)
-type DayTuple = [string, string[], number[], string[]]
-const eating = computed<DayTuple[]>(() =>
-  Array.isArray(loginStore.eatingList)
-    ? (loginStore.eatingList as unknown as DayTuple[])
-    : [],
-)
-const day = computed<DayTuple | undefined>(
-  () => eating.value[daySelector.value],
-)
-const daysCount = computed(() => eating.value.length)
+import { useUser } from '@/store/User'
+const userStore = useUser()
+const API_BASE = import.meta.env.VITE_API_BASE
 
 defineProps({
   msg: String,
 })
 
-function deleteCcalValue(val: number) {
-  if (loginStore.id !== 1) {
-    axios
-      .get(`https://dexone.pw/backend_new/data/${loginStore.id}`)
-      .then((res) => {
-        let eatingList = res.data.eatingList
+const eatingList = ref<any[]>([])
 
-        eatingList[0][1].splice(val, 1)
-        eatingList[0][2].splice(val, 1)
-        eatingList[0][3].splice(val, 1)
-        axios
-          .patch(`https://dexone.pw/backend_new/data/${loginStore.id}`, {
-            eatingList: eatingList,
-          })
-          .then(() => {
-            loginStore.getInfo()
-          })
-      })
-  } else {
-    alert('Вам необходимо создать аккаунт')
+async function getCcalToday() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/users/me/foods`, {
+      headers: {
+        Authorization: `Bearer ${userStore.token}`,
+      },
+    })
+    //выводит записи приемов пищи только за сегодня (границы дня по часовому поясу устройства)
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    const end = new Date()
+    end.setHours(23, 59, 59, 999)
+    eatingList.value = data.filter((i: any) => {
+      const d = new Date(i.eatenAt)
+      return d >= start && d <= end
+    })
+  } catch (e) {
+    console.log(e)
   }
 }
+getCcalToday()
 </script>
 
 <style scoped lang="scss">
@@ -125,9 +115,6 @@ function deleteCcalValue(val: number) {
       margin-left: 5px;
       margin-top: 0;
       padding-right: 5px;
-    }
-
-    .t-title {
     }
 
     .daySelector {

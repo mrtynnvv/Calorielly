@@ -24,7 +24,7 @@
     <RouterLink to="/settings">
       <div class="blockItem">
         <img class="icon1" src="@/assets/Footer/settings.svg"></img>
-        <div class="textUnderIcon">Цели</div>
+        <div class="textUnderIcon">Настройки</div>
       </div>
     </RouterLink>
     <RouterLink to="/profile">

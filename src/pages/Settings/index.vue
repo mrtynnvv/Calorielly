@@ -1,6 +1,6 @@
 <template>
   <div class="mainBlockSettings">
-    <div class="title">Калькулятор граммов</div>
+    <div class="title">Настройки целей</div>
 
     <div class="nameInput">Желаемый вес</div>
     <div>
@@ -25,9 +25,9 @@ import { ref } from 'vue'
 
 import UiButton from '@/components/ui/UiButton.vue'
 import UiInput from '@/components/ui/UiInput.vue'
-// @ts-ignore
-import { useLogin } from '@/store/Login'
-const loginStore = useLogin()
+import { useUser } from '@/store/User'
+const userStore = useUser()
+const API_BASE = import.meta.env.VITE_API_BASE
 
 const weight = ref<number | null>(null)
 const ccal = ref<number | null>(null)
@@ -36,33 +36,41 @@ defineProps({
   msg: String,
 })
 
-function editDesiredWeight() {
-  if (loginStore.id !== 1) {
-    axios
-      .patch(`https://dexone.pw/backend_new/data/${loginStore.id}`, {
-        desiredWeight: Number(weight.value),
-      })
-      .then(() => {
-        loginStore.getInfo()
-        weight.value = null
-      })
-  } else {
-    alert('Вам необходимо создать аккаунт')
+async function editDesiredWeight() {
+  try {
+    const { data } = await axios.patch(
+      `${API_BASE}/users/me/desired-weight`,
+      {
+        value: weight.value,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${userStore.token}`,
+        },
+      },
+    )
+    console.log(data)
+  } catch (e) {
+    console.log(e)
   }
 }
 
-function editLimitCcal() {
-  if (loginStore.id !== 1) {
-    axios
-      .patch(`https://dexone.pw/backend_new/data/${loginStore.id}`, {
-        limitCcal: Number(ccal.value),
-      })
-      .then(() => {
-        loginStore.getInfo()
-        ccal.value = null
-      })
-  } else {
-    alert('Вам необходимо создать аккаунт')
+async function editLimitCcal() {
+  try {
+    const { data } = await axios.patch(
+      `${API_BASE}/users/me/calorie-limit`,
+      {
+        value: ccal.value,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${userStore.token}`,
+        },
+      },
+    )
+    console.log(data)
+  } catch (e) {
+    console.log(e)
   }
 }
 </script>

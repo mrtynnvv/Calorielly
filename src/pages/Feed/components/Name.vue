@@ -6,13 +6,8 @@
           <img src="@/assets/default_avatar.png" />
         </div>
         <div class="text">
-          <p class="t-title">
-            {{
-              (loginStore.login ?? '').charAt(0).toUpperCase() +
-              (loginStore.login ?? '').slice(1)
-            }}
-          </p>
-          <p class="t-comment">ID: {{ loginStore.id }}</p>
+          <p class="t-title">Guest</p>
+          <p class="t-comment">ID: 0</p>
         </div>
       </div>
       <div class="rightBlock">
@@ -26,8 +21,7 @@
 import { useRouter } from 'vue-router'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
-import { useLogin } from '@/store/Login'
-const loginStore = useLogin()
+
 const router = useRouter()
 
 defineProps({

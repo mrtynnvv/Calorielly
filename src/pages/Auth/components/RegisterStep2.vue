@@ -1,4 +1,5 @@
 <template>
+  <a class="back" @click="stepBack"><img src="@/assets/Auth/back.svg" /></a>
   <UiInput v-model="password1" placeholder="Пароль" type="password" />
   <UiInput
     class="ui-input2"
@@ -10,29 +11,67 @@
 </template>
 
 <script setup lang="ts">
+import axios from 'axios'
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import UiButton from '@/components/ui/UiButton.vue'
 import UiInput from '@/components/ui/UiInput.vue'
-
+import { useUser } from '@/store/User'
+const API_BASE = import.meta.env.VITE_API_BASE
+const router = useRouter()
+const userStore = useUser()
 const password1 = ref('')
 const password2 = ref('')
 
+const props = defineProps<{ login: string }>()
+
 const emit = defineEmits<{
-  (e: 'send-password', password: string): void
   (e: 'change-step', value: string): void
 }>()
+function stepBack() {
+  emit('change-step', 'reg1')
+}
 
-function checkPassword() {
-  //проверяет совпадение паролей и отправляет в payload
+async function checkPassword() {
   if (password1.value === password2.value) {
-    emit('send-password', password1.value)
-    emit('change-step', 'reg3')
+    try {
+      const { data } = await axios.post(
+        `${API_BASE}/auth/register`,
+        {
+          phone: props.login,
+          password: password1.value,
+        },
+        {
+          headers: {
+            'Content-type': 'application/json',
+          },
+        },
+      )
+      userStore.token = data.accessToken
+      router.push('/feed')
+    } catch (e) {
+      console.log(e)
+    }
   }
 }
 </script>
 
 <style scoped lang="scss">
+.back {
+  background: none;
+  border: none;
+  cursor: pointer;
+  left: 10px;
+  padding: 10px;
+  position: absolute;
+  top: 10px;
+
+  img {
+    width: 26px;
+  }
+}
+
 .ui-input2 {
   margin-top: 18px;
 }

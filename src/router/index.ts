@@ -7,7 +7,8 @@ import timer from '@/pages/Other/timer.vue'
 import Profile from '@/pages/Profile/index.vue'
 import Scales from '@/pages/Scales/index.vue'
 import Settings from '@/pages/Settings/index.vue'
-import { useLogin } from '@/store/Login'
+import { useUser } from '@/store/User'
+import { isJwtValid } from '@/utils/jws'
 const routes = [
   { path: '/', redirect: '/feed' },
   { path: '/feed', component: Feed },
@@ -15,20 +16,12 @@ const routes = [
   {
     path: '/profile',
     component: Profile,
-    beforeEnter: () => {
-      const loginStore = useLogin()
-      if (loginStore.id === 1) return '/auth'
-    },
   },
   { path: '/Scales', component: Scales },
   {
     path: '/auth',
     component: Auth,
     meta: { blank: true },
-    beforeEnter: () => {
-      const loginStore = useLogin()
-      if (loginStore.id !== 1) return '/feed'
-    },
   }, //blank: true отрисовывает компонент без хедера, меню и тд
   // Other
   { path: '/timer', component: timer, meta: { blank: true } },
@@ -40,4 +33,19 @@ const router = createRouter({
   routes,
 })
 
+router.beforeEach((to) => {
+  const user = useUser()
+  const authed = !!user.token && isJwtValid(user.token)
+  //на /auth авторизованного юзера кидает в /feed
+  if (to.path === '/auth') {
+    if (authed) return '/feed'
+    return true
+  }
+  // все остальные роуты только для авторизованных
+  if (!authed) {
+    user.clear()
+    return '/auth'
+  }
+  return true
+})
 export default router

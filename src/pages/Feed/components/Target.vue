@@ -5,13 +5,7 @@
     </div>
 
     <div class="content">
-      <UiBlock
-        class="card"
-        v-if="
-          Array.isArray(loginStore.eatingList) &&
-          (loginStore.eatingList?.[0]?.[2]?.length ?? 0) > 1
-        "
-      >
+      <UiBlock class="card">
         <div class="image">
           <img src="@/assets/Feed/cookie.svg" />
         </div>
@@ -20,11 +14,7 @@
           <a class="t-comment"
             >осталось
 
-            {{
-              typeof loginStore.limitCcal === 'number'
-                ? (loginStore.limitCcal - sumCcalToday).toFixed()
-                : '0'
-            }}
+            {{ ccalLimit - ccalToday }}
             ккал</a
           >
 
@@ -32,25 +22,14 @@
             <div
               class="lineBlue"
               :style="{
-                width:
-                  typeof loginStore.limitCcal === 'number' &&
-                  loginStore.limitCcal > 0
-                    ? (sumCcalToday / loginStore.limitCcal) * 100 + '%'
-                    : '0%',
+                width: (ccalToday / ccalLimit) * 100 + '%',
               }"
             ></div>
           </div>
         </div>
       </UiBlock>
 
-      <UiBlock
-        class="card"
-        v-if="
-          Array.isArray(loginStore.weightList) &&
-          loginStore.weightList.length > 0 &&
-          typeof loginStore.desiredWeight === 'number'
-        "
-      >
+      <UiBlock class="card">
         <div class="image">
           <img src="@/assets/Feed/cookie.svg" />
         </div>
@@ -58,14 +37,7 @@
           <a class="t-title">Вес</a>
           <a class="t-comment"
             >осталось
-            {{
-              Math.abs(
-                (loginStore.weightList?.[0]?.[1] ?? 0) -
-                  (typeof loginStore.desiredWeight === 'number'
-                    ? loginStore.desiredWeight
-                    : 0),
-              ).toFixed(2)
-            }}
+            {{ lastWeight - desiredWeight }}
             кг
           </a>
 
@@ -73,21 +45,7 @@
             <div
               class="lineBlue"
               :style="{
-                width:
-                  (() => {
-                    const w = Number(loginStore.weightList?.[0]?.[1] ?? 0)
-                    const d =
-                      typeof loginStore.desiredWeight === 'number'
-                        ? Number(loginStore.desiredWeight)
-                        : 0
-                    return w - d >= 0
-                      ? w > 0
-                        ? (d / w) * 100
-                        : 0
-                      : d > 0
-                        ? (w / d) * 100
-                        : 0
-                  })() + '%',
+                width: (desiredWeight / lastWeight) * 100 + '%',
               }"
             ></div>
           </div>
@@ -98,25 +56,92 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import axios from 'axios'
+import { ref } from 'vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
-import { useLogin } from '@/store/Login'
-const loginStore = useLogin()
+import { useUser } from '@/store/User'
+
+const API_BASE = import.meta.env.VITE_API_BASE
+const userStore = useUser()
 
 defineProps({
   msg: String,
 })
 
-const sumCcalToday = computed(() => {
-  if (loginStore.eatingList !== 'loading') {
-    const calories = loginStore.eatingList?.[0]?.[2] ?? []
-    return Array.isArray(calories)
-      ? calories.reduce((acc, n) => acc + Number(n), 0)
-      : 0
+const ccalToday = ref(0)
+const ccalLimit = ref(0)
+const desiredWeight = ref(0)
+const lastWeight = ref(0)
+
+async function getCcalToday() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/users/me/foods`, {
+      headers: {
+        Authorization: `Bearer ${userStore.token}`,
+      },
+    })
+    //выводит записи приемов пищи только за сегодня (границы дня по часовому поясу устройства)
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    const end = new Date()
+    end.setHours(23, 59, 59, 999)
+    const todayItems = data.filter((i: any) => {
+      const d = new Date(i.eatenAt)
+      return d >= start && d <= end
+    })
+    //выводит сумму калорий за сегодня (чп аналогично)
+    ccalToday.value = todayItems.reduce(
+      (s: any, i: any) => s + Number(i.calories),
+      0,
+    )
+  } catch (e) {
+    console.log(e)
   }
-  return 0
-})
+}
+getCcalToday()
+
+async function getCcalLimit() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/users/me/calorie-limit`, {
+      headers: {
+        Authorization: `Bearer ${userStore.token}`,
+      },
+    })
+    ccalLimit.value = data.dailyCalorieLimit
+  } catch (e) {
+    console.log(e)
+  }
+}
+getCcalLimit()
+
+async function getDesiredWeight() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/users/me/desired-weight`, {
+      headers: {
+        Authorization: `Bearer ${userStore.token}`,
+      },
+    })
+    desiredWeight.value = data.desiredWeight
+  } catch (e) {
+    console.log(e)
+  }
+}
+getDesiredWeight()
+
+async function getLastWeight() {
+  try {
+    const { data } = await axios.get(`${API_BASE}/users/me/weights`, {
+      headers: {
+        Authorization: `Bearer ${userStore.token}`,
+      },
+    })
+    lastWeight.value = data.items[data.items.length - 1].weight
+  } catch (e) {
+    console.log(e)
+  }
+}
+getLastWeight()
 </script>
 
 <style scoped lang="scss">
