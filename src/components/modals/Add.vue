@@ -32,18 +32,6 @@
 
         <UiButton @click="addCcal()" text="Добавить" />
       </div>
-
-      <div class="login">
-        <div class="title">Обновить вес</div>
-        <div class="nameInput">Текущий вес</div>
-        <UiInput
-          placeholder="Введите свой вес"
-          v-model.number="weightValue"
-          type="number"
-        />
-
-        <UiButton @click="addWeight()" text="Обновить" />
-      </div>
     </div>
   </transition>
 </template>
@@ -71,26 +59,6 @@ async function addCcal() {
         title: ccalName.value,
         calories: ccalValue.value,
         grams: grValue.value,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${userStore.token}`,
-        },
-      },
-    )
-    console.log(data)
-  } catch (e) {
-    console.log(e)
-  }
-}
-
-const weightValue = ref(null)
-async function addWeight() {
-  try {
-    const { data } = await axios.post(
-      `${API_BASE}/users/me/weights`,
-      {
-        weight: weightValue.value,
       },
       {
         headers: {
