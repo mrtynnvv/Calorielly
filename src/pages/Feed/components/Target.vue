@@ -57,7 +57,7 @@
 
 <script setup lang="ts">
 import axios from 'axios'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
 import { useUser } from '@/store/User'
@@ -142,6 +142,13 @@ async function getLastWeight() {
   }
 }
 getLastWeight()
+
+watch(
+  () => userStore.feedRevision,
+  () => {
+    getCcalToday(), getLastWeight()
+  },
+)
 </script>
 
 <style scoped lang="scss">

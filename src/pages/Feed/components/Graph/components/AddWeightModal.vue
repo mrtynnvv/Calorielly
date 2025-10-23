@@ -25,7 +25,7 @@ const API_BASE = import.meta.env.VITE_API_BASE
 const weightValue = ref(null)
 async function addWeight() {
   try {
-    const { data } = await axios.post(
+    await axios.post(
       `${API_BASE}/users/me/weights`,
       {
         weight: weightValue.value,
@@ -36,7 +36,8 @@ async function addWeight() {
         },
       },
     )
-    console.log(data)
+    userStore.feedRevision++
+    weightValue.value = null
   } catch (e) {
     console.log(e)
   }

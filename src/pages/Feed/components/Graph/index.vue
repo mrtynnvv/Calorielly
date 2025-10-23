@@ -14,10 +14,10 @@
 
 <script setup lang="ts">
 import axios from 'axios'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
-import Chart from './Chart.vue'
 import AddWeightModal from './components/AddWeightModal.vue'
+import Chart from './components/Chart.vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
 import UiModal from '@/components/ui/UiModal.vue'
@@ -50,6 +50,13 @@ async function getWeights() {
 }
 
 getWeights()
+
+watch(
+  () => userStore.feedRevision,
+  () => {
+    getWeights()
+  },
+)
 </script>
 
 <style scoped lang="scss">

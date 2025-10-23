@@ -1,8 +1,9 @@
 <template>
+  <UiModal :open="isOpen" @close="isOpen = false"><AddFoodModal /></UiModal>
   <UiBlock class="ui-block">
     <a class="t-title">Калорий сегодня</a>
 
-    <div class="content" @click="$emit('open')">
+    <div class="content" @click="isOpen = true">
       <div class="leftBlock">
         <div class="icon">
           <img src="@/assets/Feed/fire.svg" />
@@ -21,14 +22,18 @@
 
 <script setup lang="ts">
 import axios from 'axios'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+
+import AddFoodModal from './components/AddFoodModal.vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
+import UiModal from '@/components/ui/UiModal.vue'
 import { useUser } from '@/store/User'
 const API_BASE = import.meta.env.VITE_API_BASE
 const userStore = useUser()
 
 const emit = defineEmits(['open'])
+const isOpen = ref(false)
 
 const backTime = ref('')
 const upTime = ref(0)
@@ -69,6 +74,12 @@ async function getCcalToday() {
   }
 }
 getCcalToday()
+watch(
+  () => userStore.feedRevision,
+  () => {
+    getCcalToday()
+  },
+)
 </script>
 
 <style scoped lang="scss">

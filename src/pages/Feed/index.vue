@@ -13,7 +13,7 @@
 <script setup lang="ts">
 import Graph from './components/Graph/index.vue'
 import Name from './components/Name.vue'
-import Now from './components/Now.vue'
+import Now from './components/Now/index.vue'
 import Target from './components/Target.vue'
 import TimeLine from './components/TimeLine.vue'
 

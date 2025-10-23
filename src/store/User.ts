@@ -2,11 +2,13 @@ import { defineStore } from 'pinia'
 
 type State = {
   token: string
+  feedRevision: number
 }
 
 export const useUser = defineStore('userStore', {
   state: (): State => ({
     token: '',
+    feedRevision: 0,
   }),
 
   getters: {

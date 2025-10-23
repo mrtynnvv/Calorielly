@@ -53,7 +53,7 @@ const grValue = ref(null)
 
 async function addCcal() {
   try {
-    const { data } = await axios.post(
+    await axios.post(
       `${API_BASE}/users/me/foods`,
       {
         title: ccalName.value,
@@ -66,7 +66,7 @@ async function addCcal() {
         },
       },
     )
-    console.log(data)
+    userStore.feedRevision++
   } catch (e) {
     console.log(e)
   }

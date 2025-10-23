@@ -64,7 +64,7 @@
 
 <script setup lang="ts">
 import axios from 'axios'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
 import { useUser } from '@/store/User'
@@ -89,15 +89,23 @@ async function getCcalToday() {
     start.setHours(0, 0, 0, 0)
     const end = new Date()
     end.setHours(23, 59, 59, 999)
-    eatingList.value = data.filter((i: any) => {
-      const d = new Date(i.eatenAt)
-      return d >= start && d <= end
-    })
+    eatingList.value = data
+      .filter((i: any) => {
+        const d = new Date(i.eatenAt)
+        return d >= start && d <= end
+      })
+      .reverse()
   } catch (e) {
     console.log(e)
   }
 }
 getCcalToday()
+watch(
+  () => userStore.feedRevision,
+  () => {
+    getCcalToday()
+  },
+)
 </script>
 
 <style scoped lang="scss">
