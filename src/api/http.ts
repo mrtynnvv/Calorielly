@@ -15,7 +15,7 @@ export function setupHttp(router: Router) {
     const user = useUser()
     if (user.token) {
       config.headers = config.headers ?? {}
-        ; (config.headers as any).Authorization = `Bearer ${user.token}`
+      ;(config.headers as any).Authorization = `Bearer ${user.token}`
     }
     return config
   })
@@ -38,7 +38,10 @@ export function setupHttp(router: Router) {
 }
 
 // включает демо режим по домену demo.
-const IS_DEMO = typeof location !== 'undefined' && (location.hostname.startsWith('demo.') || location.pathname.startsWith('/demo'))
+const IS_DEMO =
+  typeof location !== 'undefined' &&
+  (location.hostname.startsWith('demo.') ||
+    location.pathname.startsWith('/demo'))
 
 if (IS_DEMO) {
   // сохраняет оригинальные адаптеры, чтобы уметь падать обратно
@@ -76,9 +79,15 @@ function demoAdapter(original: any) {
     cache = await res.json()
 
     const dates: string[] = []
-      ; (cache['GET /users/me/foods'] || []).forEach((f: any) => dates.push(f.eatenAt))
-      ; (cache['GET /users/me/weights']?.items || []).forEach((w: any) => dates.push(w.measuredAt))
-      ; (cache['GET /users/me/timeline'] || []).forEach((t: any) => dates.push(t.date))
+    ;(cache['GET /users/me/foods'] || []).forEach((f: any) =>
+      dates.push(f.eatenAt),
+    )
+    ;(cache['GET /users/me/weights']?.items || []).forEach((w: any) =>
+      dates.push(w.measuredAt),
+    )
+    ;(cache['GET /users/me/timeline'] || []).forEach((t: any) =>
+      dates.push(t.date),
+    )
 
     // находит последний день в демо-данных и считает разницу с сегодня
     const last = new Date(dates.sort()[dates.length - 1]!)
@@ -89,13 +98,29 @@ function demoAdapter(original: any) {
   // утилиты формирования успешного/ошибочного ответа axios
   const ok = (config: any, data: any, status = 200) =>
     Promise.resolve({ data, status, statusText: 'OK', headers: {}, config })
-  const err = (config: any, status = 403, data: any = { message: 'Demo: read-only' }) =>
-    Promise.resolve({ data, status, statusText: 'Forbidden', headers: {}, config })
+  const err = (
+    config: any,
+    status = 403,
+    data: any = { message: 'Demo: read-only' },
+  ) =>
+    Promise.resolve({
+      data,
+      status,
+      statusText: 'Forbidden',
+      headers: {},
+      config,
+    })
 
   // сам адаптер: решает, что вернуть по запросу
   return async (config: any) => {
     const method = (config.method || 'get').toLowerCase()
-    const url = new URL(config.url!, config.baseURL || (typeof location !== 'undefined' ? location.origin : 'http://localhost'))
+    const url = new URL(
+      config.url!,
+      config.baseURL ||
+        (typeof location !== 'undefined'
+          ? location.origin
+          : 'http://localhost'),
+    )
     const path = url.pathname
 
     // только в демо подменяет, иначе отдает в оригинальный адаптер

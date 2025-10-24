@@ -9,11 +9,6 @@
           <img src="@/assets/Feed/pizza.svg" />
         </div>
         <div class="text">
-          <!-- <p class="t-main">
-            {{ item.data.title }}
-            <a>{{ item.data.calories }} ккал {{ item.data.grams }} гр</a>
-          </p> -->
-
           <p class="t-main" v-if="item.type === 'food'">
             {{ item.data.title }}
             <a>{{ item.data.calories }} ккал {{ item.data.grams }} гр</a>
@@ -33,12 +28,9 @@
           </p>
         </div>
       </div>
-      <!-- <div
-        class="rightBlock"
-        @click="day && deleteCcalValue(day[2].length - 1 - index)"
-      >
+      <div class="rightBlock" @click="deleteItem(item.data.id)">
         <img src="@/assets/close-gray.svg" />
-      </div> -->
+      </div>
     </div>
   </UiBlock>
 </template>
@@ -85,6 +77,17 @@ function groupByLocalDay(items: Item[]): Item[][] {
   return Array.from(buckets.entries())
     .sort((a, b) => b[0] - a[0])
     .map(([, arr]) => arr)
+}
+
+async function deleteItem(id: any) {
+  try {
+    await axios.delete(`${API_BASE}/users/me/entries/${id}`, {
+      headers: { Authorization: `Bearer ${userStore.token}` },
+    })
+    load()
+  } catch (e) {
+    console.log(e)
+  }
 }
 </script>
 

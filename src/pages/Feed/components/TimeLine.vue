@@ -56,12 +56,9 @@
           </p>
         </div>
       </div>
-      <!-- <div
-        class="rightBlock"
-        @click="day && deleteCcalValue(day[2].length - 1 - index)"
-      >
+      <div class="rightBlock" @click="deleteItem(eat.data.id)">
         <img src="@/assets/close-gray.svg" />
-      </div> -->
+      </div>
     </div>
   </UiBlock>
 </template>
@@ -105,6 +102,17 @@ watch(
     getCcalToday()
   },
 )
+
+async function deleteItem(id: any) {
+  try {
+    await axios.delete(`${API_BASE}/users/me/entries/${id}`, {
+      headers: { Authorization: `Bearer ${userStore.token}` },
+    })
+    userStore.feedRevision++
+  } catch (e) {
+    console.log(e)
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -122,62 +130,6 @@ watch(
       margin-left: 5px;
       margin-top: 0;
       padding-right: 5px;
-    }
-
-    .daySelector {
-      align-items: center;
-      display: flex;
-
-      .selectorBack {
-        img {
-          background-color: rgb(0 0 0 / 7%);
-          border-radius: 100%;
-          color: #666;
-          cursor: pointer;
-          margin-right: 8px;
-          padding: 1px;
-          transform: rotate(180deg);
-          transition: 0.3s;
-          width: 18px;
-
-          &:hover {
-            background-color: rgb(0 0 0 / 14%);
-            color: #9b9b9b;
-            transition: 0.3s;
-          }
-
-          @media (width <=1000px) {
-            width: 15px;
-          }
-        }
-      }
-
-      .t-title {
-        color: $palette-blue;
-      }
-
-      .selectorForward {
-        img {
-          background-color: rgb(0 0 0 / 7%);
-          border-radius: 100%;
-          color: #666;
-          cursor: pointer;
-          margin-left: 8px;
-          padding: 1px;
-          transition: 0.3s;
-          width: 18px;
-
-          &:hover {
-            background-color: rgb(0 0 0 / 14%);
-            color: #9b9b9b;
-            transition: 0.3s;
-          }
-
-          @media (width <=1000px) {
-            width: 15px;
-          }
-        }
-      }
     }
   }
 

@@ -16,7 +16,7 @@
 
     <RouterLink to="/history">
       <div class="blockItem">
-        <img class="icon1" src="@/assets/Footer/add.svg"></img>
+        <img class="icon1" src="@/assets/Footer/history.svg"></img>
         <div class="textUnderIcon">История</div>
       </div>
     </RouterLink>
