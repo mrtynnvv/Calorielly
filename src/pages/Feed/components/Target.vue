@@ -65,10 +65,6 @@ import { useUser } from '@/store/User'
 const API_BASE = import.meta.env.VITE_API_BASE
 const userStore = useUser()
 
-defineProps({
-  msg: String,
-})
-
 const ccalToday = ref(0)
 const ccalLimit = ref(0)
 const desiredWeight = ref(0)

@@ -1,10 +1,8 @@
 <template>
-  <Add :open="showAdd" @close="showAdd = false" />
-
   <RouterView v-slot="{ Component, route }">
     <!-- компоненты без хедера и меню -->
     <template v-if="route.meta.blank">
-      <component :is="Component" @open="showAdd = true" />
+      <component :is="Component" />
     </template>
     <!-- компоненты с хедером и меню -->
     <template v-else>
@@ -12,13 +10,13 @@
 
       <div class="all">
         <div class="leftbar">
-          <LeftBar @open="showAdd = true" />
+          <LeftBar />
         </div>
 
         <div class="main">
-          <component :is="Component" @open="showAdd = true" />
+          <component :is="Component" />
 
-          <Footer class="footer" @open="showAdd = true" />
+          <Footer class="footer" />
         </div>
       </div>
     </template>
@@ -28,14 +26,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-
-import Add from './components/modals/Add.vue'
-
 import Footer from '@/components/blocks/Footer.vue'
 import Header from '@/components/blocks/Header.vue'
 import LeftBar from '@/components/blocks/LeftBar.vue'
-const showAdd = ref(false)
 </script>
 
 <style scoped>

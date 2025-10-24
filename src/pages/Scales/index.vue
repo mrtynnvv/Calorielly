@@ -42,10 +42,6 @@ function chetGR() {
     itogGR.value = 0
   }
 }
-
-defineProps({
-  msg: String,
-})
 </script>
 
 <style scoped lang="scss">

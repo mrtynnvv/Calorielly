@@ -16,10 +16,13 @@
         <span>Весы</span>
       </div>
     </RouterLink>
-    <div class="section" @click="$emit('open')">
-      <img src="@/assets/LeftBar/add.svg"></img>
-      Добавить значение
-    </div>
+ <RouterLink to="/history">
+      <div class="section">
+        <img src="@/assets/LeftBar/history.svg"></img>
+
+        <span>История</span>
+      </div>
+    </RouterLink>
     <RouterLink to="/settings">
       <div class="section">
         <img src="@/assets/LeftBar/settings.svg"></img>
@@ -40,10 +43,7 @@
 <script setup lang='ts'>
 import UiBlock from '@/components/ui/UiBlock.vue';
 
-const emit = defineEmits(['open'])
-defineProps({
-  msg: String,
-})
+
 </script>
 
 <style scoped lang="scss">

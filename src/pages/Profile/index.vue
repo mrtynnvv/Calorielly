@@ -6,10 +6,6 @@
 
 <script setup lang="ts">
 import AccountInfo from './components/AccountInfo.vue'
-
-defineProps({
-  msg: String,
-})
 </script>
 
 <style scoped lang="scss">

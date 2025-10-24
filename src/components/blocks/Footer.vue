@@ -14,12 +14,12 @@
       </div>
     </RouterLink>
 
-    <a>
-      <div class="blockItem" @click="$emit('open')">
+    <RouterLink to="/history">
+      <div class="blockItem">
         <img class="icon1" src="@/assets/Footer/add.svg"></img>
-        <div class="textUnderIcon">Добавить</div>
+        <div class="textUnderIcon">История</div>
       </div>
-    </a>
+    </RouterLink>
 
     <RouterLink to="/settings">
       <div class="blockItem">
@@ -36,14 +36,7 @@
   </div>
 </template>
 
-<script setup lang="ts">
 
-const emit = defineEmits(['open'])
-
-defineProps({
-  msg: String,
-})
-</script>
 
 <style scoped lang="scss">
 .mainBlockFooter {

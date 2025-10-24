@@ -23,10 +23,6 @@ import { useRouter } from 'vue-router'
 import UiBlock from '@/components/ui/UiBlock.vue'
 
 const router = useRouter()
-
-defineProps({
-  msg: String,
-})
 </script>
 
 <style scoped lang="scss">

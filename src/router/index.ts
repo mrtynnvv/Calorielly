@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import Auth from '@/pages/Auth/index.vue'
 import Feed from '@/pages/Feed/index.vue'
+import History from '@/pages/History/index.vue'
 import game from '@/pages/Other/game.vue'
 import timer from '@/pages/Other/timer.vue'
 import Profile from '@/pages/Profile/index.vue'
@@ -13,6 +14,7 @@ const routes = [
   { path: '/', redirect: '/feed' },
   { path: '/feed', component: Feed },
   { path: '/settings', component: Settings },
+  { path: '/history', component: History },
   {
     path: '/profile',
     component: Profile,
@@ -34,6 +36,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  if(location.hostname.startsWith('demo')){if(to.path === '/auth') return '/feed'; return true}
   const user = useUser()
   const authed = !!user.token && isJwtValid(user.token)
   //на /auth авторизованного юзера кидает в /feed

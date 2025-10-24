@@ -10,9 +10,6 @@ import UiButton from '@/components/ui/UiButton.vue'
 import { useUser } from '@/store/User'
 const router = useRouter()
 const userStore = useUser()
-defineProps({
-  msg: String,
-})
 
 function exit() {
   userStore.clear()

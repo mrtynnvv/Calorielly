@@ -32,10 +32,6 @@ const API_BASE = import.meta.env.VITE_API_BASE
 const weight = ref<number | null>(null)
 const ccal = ref<number | null>(null)
 
-defineProps({
-  msg: String,
-})
-
 async function editDesiredWeight() {
   try {
     const { data } = await axios.patch(

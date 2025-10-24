@@ -1,54 +1,31 @@
 <template>
-  <UiBlock class="ui-block">
+  <UiBlock class="ui-block" v-for="items in days">
     <div class="header">
       <a class="t-title">События сегодня</a>
-      <!-- <div class="daySelector">
-        <a
-          class="selectorBack"
-          @click="
-            () => {
-              if (daysCount > daySelector + 1) {
-                daySelector++
-              }
-            }
-          "
-        >
-          <img class="back" src="@/assets/Feed/arrow-right.svg"
-        /></a>
-        <a class="t-title">{{ day ? day[0] : '' }}</a>
-
-        <a
-          v-if="daySelector !== 0"
-          class="selectorForward"
-          @click="
-            () => {
-              if (daySelector > 0) {
-                daySelector--
-              }
-            }
-          "
-        >
-          <img class="back" src="@/assets/Feed/arrow-right.svg"
-        /></a>
-      </div> -->
     </div>
-    <div v-for="eat in eatingList" class="content" @click="$emit('open')">
+    <div v-for="item in items" class="content" @click="$emit('open')">
       <div class="leftBlock">
         <div class="icon">
           <img src="@/assets/Feed/pizza.svg" />
         </div>
         <div class="text">
-          <p class="t-main" v-if="eat.type === 'food'">
-            {{ eat.data.title }}
-            <a>{{ eat.data.calories }} ккал</a>
+          <!-- <p class="t-main">
+            {{ item.data.title }}
+            <a>{{ item.data.calories }} ккал {{ item.data.grams }} гр</a>
+          </p> -->
+
+          <p class="t-main" v-if="item.type === 'food'">
+            {{ item.data.title }}
+            <a>{{ item.data.calories }} ккал {{ item.data.grams }} гр</a>
           </p>
           <p class="t-main" v-else>
             Обновлен вес
-            <a>{{ eat.data.weight }} кг</a>
+            <a>{{ item.data.weight }} кг</a>
           </p>
+
           <p class="t-comment">
             {{
-              new Date(eat.date).toLocaleTimeString('ru-RU', {
+              new Date(item.date).toLocaleTimeString('ru-RU', {
                 hour: '2-digit',
                 minute: '2-digit',
               })
@@ -68,43 +45,47 @@
 
 <script setup lang="ts">
 import axios from 'axios'
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
+// import UiButton from '@/components/ui/UiButton.vue'
+// import UiInput from '@/components/ui/UiInput.vue'
 import { useUser } from '@/store/User'
 const userStore = useUser()
 const API_BASE = import.meta.env.VITE_API_BASE
 
-const eatingList = ref<any[]>([])
+type Item = { id: string; type: 'food' | 'weight'; date: string; data: any }
+const days = ref<Item[][]>([])
+// запрос записей с сервера и группировка по функции groupByLocalDay
+async function load() {
+  const { data } = await axios.get(`${API_BASE}/users/me/timeline`, {
+    headers: { Authorization: `Bearer ${userStore.token}` },
+  })
 
-async function getCcalToday() {
-  try {
-    const { data } = await axios.get(`${API_BASE}/users/me/timeline`, {
-      headers: {
-        Authorization: `Bearer ${userStore.token}`,
-      },
-    })
-    console.log(data)
-    //выводит записи приемов пищи только за сегодня (границы дня по часовому поясу устройства)
-    const start = new Date()
-    start.setHours(0, 0, 0, 0)
-    const end = new Date()
-    end.setHours(23, 59, 59, 999)
-    eatingList.value = data.filter((i: any) => {
-      const d = new Date(i.date)
-      return d >= start && d <= end
-    })
-  } catch (e) {
-    console.log(e)
-  }
+  days.value = groupByLocalDay(data)
+  console.log(days)
 }
-getCcalToday()
-watch(
-  () => userStore.feedRevision,
-  () => {
-    getCcalToday()
-  },
-)
+load()
+
+function groupByLocalDay(items: Item[]): Item[][] {
+  //сортирует все записи по времени, новые сверху
+  const sorted = items
+    .slice()
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  const buckets = new Map<number, Item[]>()
+  for (const it of sorted) {
+    const d = new Date(it.date)
+    d.setHours(0, 0, 0, 0) //полночь по времени устройства
+    const key = d.getTime() //ключ дня
+    if (!buckets.has(key)) buckets.set(key, [])
+    buckets.get(key)!.push(it) //кладет запись в нужный день
+  }
+  //дни от нового к старому, внутри дня отсортировано выше
+  return Array.from(buckets.entries())
+    .sort((a, b) => b[0] - a[0])
+    .map(([, arr]) => arr)
+}
 </script>
 
 <style scoped lang="scss">

@@ -6,7 +6,7 @@
     <transition name="modal-anim" appear>
       <div class="mainBlockAdd" v-show="open">
         <div class="close" @click="$emit('close')">
-          <img class="img-white" src="@/assets/Add/close.svg" />
+          <img class="img-white" src="@/assets/close.svg" />
           <img class="img-gray" src="@/assets/close-gray.svg" />
         </div>
 

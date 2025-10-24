@@ -41,9 +41,6 @@ setInterval(() => updateTime(), 60000) //обновлено ... мин наза�
 function updateTime() {
   backTime.value = ((Date.now() - upTime.value) / 1000 / 60).toFixed()
 }
-defineProps({
-  msg: String,
-})
 
 const ccalToday = ref(0)
 async function getCcalToday() {
