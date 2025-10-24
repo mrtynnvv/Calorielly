@@ -38,7 +38,7 @@ export function setupHttp(router: Router) {
 }
 
 // включает демо режим по домену demo.
-const IS_DEMO = typeof location !== 'undefined' && location.hostname.startsWith('demo.')
+const IS_DEMO = typeof location !== 'undefined' && (location.hostname.startsWith('demo.') || location.pathname.startsWith('/demo'))
 
 if (IS_DEMO) {
   // сохраняет оригинальные адаптеры, чтобы уметь падать обратно

@@ -20,6 +20,8 @@ pinia.use(piniaPluginPersistedstate)
 
 app.use(pinia)
 if (location.hostname.startsWith('demo')) { useUser().setToken('demo') }
+const IS_DEMO = location.hostname.startsWith('demo.') || location.pathname.startsWith('/demo')
+if(IS_DEMO){useUser().setToken('demo')}
 app.use(router)
 
 setupHttp(router)

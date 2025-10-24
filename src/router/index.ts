@@ -30,12 +30,16 @@ const routes = [
   { path: '/game', component: game, meta: { blank: true } },
 ]
 
+const IS_DEMO = location.hostname.startsWith('demo.') || location.pathname.startsWith('/demo')
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(IS_DEMO ? '/demo' : '/'),
   routes,
 })
 
 router.beforeEach((to) => {
+  if(IS_DEMO){
+    if(to.path === '/auth') return '/feed'; return true
+  }
   if(location.hostname.startsWith('demo')){if(to.path === '/auth') return '/feed'; return true}
   const user = useUser()
   const authed = !!user.token && isJwtValid(user.token)
