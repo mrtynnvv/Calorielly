@@ -15,7 +15,7 @@ export function setupHttp(router: Router) {
     const user = useUser()
     if (user.token) {
       config.headers = config.headers ?? {}
-      ;(config.headers as any).Authorization = `Bearer ${user.token}`
+        ; (config.headers as any).Authorization = `Bearer ${user.token}`
     }
     return config
   })
@@ -76,12 +76,12 @@ function demoAdapter(original: any) {
     cache = await res.json()
 
     const dates: string[] = []
-    ;(cache['GET /users/me/foods'] || []).forEach((f: any) => dates.push(f.eatenAt))
-    ;(cache['GET /users/me/weights']?.items || []).forEach((w: any) => dates.push(w.measuredAt))
-    ;(cache['GET /users/me/timeline'] || []).forEach((t: any) => dates.push(t.date))
+      ; (cache['GET /users/me/foods'] || []).forEach((f: any) => dates.push(f.eatenAt))
+      ; (cache['GET /users/me/weights']?.items || []).forEach((w: any) => dates.push(w.measuredAt))
+      ; (cache['GET /users/me/timeline'] || []).forEach((t: any) => dates.push(t.date))
 
     // находит последний день в демо-данных и считает разницу с сегодня
-    const last = new Date(dates.sort().slice(-1)[0])
+    const last = new Date(dates.sort()[dates.length - 1]!)
     deltaDays = daysDiff(dayStart(new Date()), dayStart(last))
     return cache
   }
@@ -111,7 +111,7 @@ function demoAdapter(original: any) {
 
     // отдаем заготовленные ответы по известным эндпоинтам
     if (method === 'get') {
-     if (path.endsWith('/users/me/foods')) {
+      if (path.endsWith('/users/me/foods')) {
         const data = (db['GET /users/me/foods'] || []).map((f: any) => ({
           ...f,
           eatenAt: rebase(f.eatenAt),
@@ -126,7 +126,7 @@ function demoAdapter(original: any) {
         return ok(config, { items, truncated: false })
       }
 
-     if (path.endsWith('/users/me/calorie-limit')) {
+      if (path.endsWith('/users/me/calorie-limit')) {
         return ok(config, db['GET /users/me/calorie-limit'])
       }
 
@@ -134,7 +134,7 @@ function demoAdapter(original: any) {
         return ok(config, db['GET /users/me/desired-weight'])
       }
 
-      if (path.endsWith('/users/me/timeline')){
+      if (path.endsWith('/users/me/timeline')) {
         const data = (db['GET /users/me/timeline'] || []).map((t: any) => ({
           ...t,
           date: rebase(t.date),
