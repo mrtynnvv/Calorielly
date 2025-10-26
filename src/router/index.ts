@@ -5,6 +5,7 @@ import Feed from '@/pages/Feed/index.vue'
 import History from '@/pages/History/index.vue'
 import game from '@/pages/Other/game.vue'
 import timer from '@/pages/Other/timer.vue'
+import mileage from '@/pages/Other/mileage.vue'
 import Profile from '@/pages/Profile/index.vue'
 import Scales from '@/pages/Scales/index.vue'
 import Settings from '@/pages/Settings/index.vue'
@@ -28,6 +29,7 @@ const routes = [
   // Other
   { path: '/timer', component: timer, meta: { blank: true } },
   { path: '/game', component: game, meta: { blank: true } },
+  { path: '/mileage', component: mileage, meta: { blank: true } },
 ]
 
 const IS_DEMO =
