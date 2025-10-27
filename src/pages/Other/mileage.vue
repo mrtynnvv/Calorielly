@@ -30,7 +30,6 @@
       <div class="sub">Среднесуточный: {{ fmt1(avgPerDay) }} км/день</div>
     </div>
   </div>
-  
 </template>
 
 <script setup lang="ts">
@@ -72,15 +71,11 @@ const annualized = computed<number>(() => {
 })
 
 function fmt(n: number): string {
-  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(
-    n,
-  )
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(n)
 }
 
 function fmt1(n: number): string {
-  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(
-    n,
-  )
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(n)
 }
 </script>
 
@@ -95,10 +90,10 @@ function fmt1(n: number): string {
 }
 
 .panel {
-  background: #ffffff;
+  background: #fff;
   border: 1px solid #eee;
   border-radius: 16px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 6%);
   display: grid;
   gap: 16px;
   padding: 20px 24px;
@@ -170,4 +165,3 @@ function fmt1(n: number): string {
   text-align: center;
 }
 </style>
-

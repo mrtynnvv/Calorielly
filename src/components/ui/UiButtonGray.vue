@@ -10,7 +10,7 @@ defineProps({ text: { type: String } })
 
 <style scoped lang="scss">
 .ui-button {
-    background-color: rgba(0, 0, 0, 0.04);
+  background-color: rgb(0 0 0 / 4%);
   border: none;
   border-radius: 8px;
   color: #2688eb;
@@ -22,7 +22,7 @@ defineProps({ text: { type: String } })
   width: 100%;
 
   &:hover {
-    background-color: rgba(0, 0, 0, 0.08);
+    background-color: rgb(0 0 0 / 8%);
     cursor: pointer;
     transition: 0.3s;
   }

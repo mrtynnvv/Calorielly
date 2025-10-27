@@ -4,7 +4,7 @@
     <div class="nameInput">Текущий вес</div>
     <UiInput
       placeholder="Введите свой вес"
-      v-model.number="weightValue"
+      v-model="weightValue"
       type="number"
     />
 

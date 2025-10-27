@@ -1,7 +1,13 @@
 <template>
-  <UiBlock class="ui-block" v-for="items in days">
+  <UiBlock class="ui-block" v-for="(items, index) in days">
     <div class="header">
-      <a class="t-title">События сегодня</a>
+      <a class="t-title" v-if="items[index]">{{
+        new Date(items[index].date).toLocaleDateString('ru-RU', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+      }}</a>
     </div>
     <div v-for="item in items" class="content" @click="$emit('open')">
       <div class="leftBlock">
