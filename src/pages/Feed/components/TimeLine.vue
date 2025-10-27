@@ -39,7 +39,7 @@
         </div>
         <div class="text">
           <p class="t-main" v-if="eat.type === 'food'">
-            {{ eat.data.title }}
+            {{ truncate(eat.data.title, 16) }}
             <a>{{ eat.data.calories }} ккал</a>
           </p>
           <p class="t-main" v-else>
@@ -112,6 +112,11 @@ async function deleteItem(id: any) {
   } catch (e) {
     console.log(e)
   }
+}
+
+function truncate(text: string | null | undefined, max = 26) {
+  const s = (text ?? '').trim()
+  return s.length > max ? s.slice(0, max) + '...' : s
 }
 </script>
 
