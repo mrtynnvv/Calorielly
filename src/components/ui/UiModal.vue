@@ -36,29 +36,31 @@ defineEmits<{ (e: 'close'): void }>()
   background-color: rgb(255 255 255 / 100%);
   border: 0.5px solid #d9d9d9;
   border-radius: 16px;
-  bottom: 35%;
-  height: max-content;
-  left: 0;
   margin: 0 auto;
+  max-height: 99dvh;
   max-width: 400px;
   padding: 0 36px 36px;
   position: fixed;
-  right: 0;
   width: 100%;
   z-index: 3301;
 
+  @media (width >1000px) {
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%);
+  }
+
   @media (width <=1000px) {
-    bottom: 1%;
+    inset: auto 0 0;
   }
 
   .close {
     background-color: rgb(0 0 0 / 40%);
     border-radius: 100%;
     color: #666;
-    float: right;
-    margin-right: -80px;
-    margin-top: 14px;
     padding: 4px;
+    position: absolute;
+    right: -45px;
+    top: 14px;
     transition: 0.3s;
 
     &:hover {
@@ -70,7 +72,8 @@ defineEmits<{ (e: 'close'): void }>()
 
     @media (width <=1000px) {
       background: none;
-      margin-right: -20px;
+      right: 10px;
+      top: 10px;
 
       .img-white {
         display: none;
@@ -82,6 +85,47 @@ defineEmits<{ (e: 'close'): void }>()
         display: none;
       }
     }
+  }
+}
+
+/* для модалок: десктоп - плавное появление, моб - выезжает снизу */
+.modal-anim-enter-active,
+.modal-anim-leave-active {
+  transition:
+    transform 0.3s ease-out,
+    opacity 0.3s ease-out;
+  will-change: transform, opacity;
+}
+
+@media (width < 1000px) {
+  .modal-anim-enter-from,
+  .modal-anim-leave-to {
+    opacity: 0.001;
+    transform: translateY(100%);
+  }
+
+  .modal-anim-enter-to,
+  .modal-anim-leave-from {
+    opacity: 1;
+    transform: translateY(0%);
+  }
+}
+
+@media (width >=1000px) {
+  .modal-anim-enter-active,
+  .modal-anim-leave-active {
+    transition: opacity 0.25s ease;
+    will-change: opacity;
+  }
+
+  .modal-anim-enter-from,
+  .modal-anim-leave-to {
+    opacity: 0;
+  }
+
+  .modal-anim-enter-to,
+  .modal-anim-leave-from {
+    opacity: 1;
   }
 }
 </style>

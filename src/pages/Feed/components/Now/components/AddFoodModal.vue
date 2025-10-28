@@ -94,6 +94,9 @@ async function addCcal() {
         },
       },
     )
+    ccalValue.value = null
+    ccalName.value = ''
+    grValue.value = null
     userStore.feedRevision++
   } catch (e) {
     console.log(e)
@@ -169,6 +172,15 @@ watch(
 
 <style scoped lang="scss">
 .modal {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  max-height: 99dvh;
+
+  // display: flex;
+  // flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+
   .login {
     .title {
       font-size: 17px;
@@ -196,12 +208,16 @@ watch(
   }
 
   .favorite {
-    max-height: 90vh;
-    max-height: 180px;
+    margin-bottom: 20px;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
     overflow-y: auto;
+    padding-right: 10px;
+    scrollbar-gutter: stable;
 
     .content {
       display: flex;
+      gap: 8px;
       justify-content: space-between;
       transition: 0.5s;
 
@@ -212,9 +228,12 @@ watch(
       .leftBlock {
         align-items: center;
         display: flex;
+        min-width: 0;
 
         .text {
           display: block;
+          min-width: 0;
+          overflow: hidden;
 
           a {
             color: #58636f;
@@ -224,9 +243,9 @@ watch(
 
       .rightBlock {
         align-items: center;
-        display: inline-flex;
         display: flex;
         margin-bottom: 8px;
+        margin-right: -10px;
 
         .ui-button-gray {
           align-items: center;
