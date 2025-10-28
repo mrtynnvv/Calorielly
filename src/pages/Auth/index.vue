@@ -32,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 import EnterStep1 from './components/EnterStep1.vue'
 import RegisterStep1 from './components/RegisterStep1.vue'
@@ -51,6 +51,9 @@ const switchAuth = () => {
 const onChangeStep = (s: Step | string) => {
   steps.value = s as Step
 }
+//белый фон только на /auth
+onMounted(() => document.documentElement.classList.add('auth-white'))
+onBeforeUnmount(() => document.documentElement.classList.remove('auth-white'))
 </script>
 
 <style scoped lang="scss">
@@ -151,6 +154,16 @@ const onChangeStep = (s: Step | string) => {
         }
       }
     }
+  }
+}
+</style>
+
+<!-- белый фон только на /auth -->
+<style>
+html.auth-white,
+html.auth-white body {
+  @media (width <=1000px) {
+    background: #fff !important;
   }
 }
 </style>

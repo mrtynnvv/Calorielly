@@ -16,7 +16,7 @@
         <span>Весы</span>
       </div>
     </RouterLink>
- <RouterLink to="/history">
+    <RouterLink to="/history">
       <div class="section">
         <img src="@/assets/LeftBar/history.svg"></img>
 
@@ -38,16 +38,42 @@
     </RouterLink>
     <!-- </div> -->
   </UiBlock>
+
+  <!-- <UiBlock class="ui-block">
+
+    <a href="/auth">
+      <div class="section">
+
+        <img src="@/assets/LeftBar/left-arrow.svg"></img>
+        <span>Вернуться к авторизации</span>
+      </div>
+    </a>
+
+  </UiBlock> -->
+
+  <ToAuth v-if="IS_DEMO" class="ui-block">
+
+    <a href="/auth">
+      <div class="section">
+
+        <img src="@/assets/LeftBar/left-arrow.svg"></img>
+        <span>Вернуться к авторизации</span>
+      </div>
+    </a>
+
+  </ToAuth>
 </template>
 
 <script setup lang='ts'>
+import ToAuth from '@/components/blocks/ToAuth.vue';
 import UiBlock from '@/components/ui/UiBlock.vue';
-
+const IS_DEMO = location.hostname.startsWith('demo.') || location.pathname.startsWith('/demo')
 
 </script>
 
 <style scoped lang="scss">
 .ui-block {
+  margin-bottom: 2px;
   margin-right: 20px;
   padding: 8px;
   text-decoration: none;
@@ -60,6 +86,7 @@ import UiBlock from '@/components/ui/UiBlock.vue';
       cursor: pointer;
       transition: 0.3s;
     }
+    
   }
 
   .section {
@@ -81,6 +108,7 @@ import UiBlock from '@/components/ui/UiBlock.vue';
     margin-top: -5px;
     stroke: #2688EB;
     width: 32px;
+    
   }
 
 
@@ -89,6 +117,7 @@ import UiBlock from '@/components/ui/UiBlock.vue';
     font-size: 15px;
     font-weight: 500;
     text-decoration: none;
+    
   }
 }
 </style>

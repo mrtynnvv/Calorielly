@@ -1,41 +1,14 @@
 <template>
   <UiBlock class="ui-block">
     <div class="header">
-      <a class="t-title">События сегодня</a>
-      <!-- <div class="daySelector">
-        <a
-          class="selectorBack"
-          @click="
-            () => {
-              if (daysCount > daySelector + 1) {
-                daySelector++
-              }
-            }
-          "
-        >
-          <img class="back" src="@/assets/Feed/arrow-right.svg"
-        /></a>
-        <a class="t-title">{{ day ? day[0] : '' }}</a>
-
-        <a
-          v-if="daySelector !== 0"
-          class="selectorForward"
-          @click="
-            () => {
-              if (daySelector > 0) {
-                daySelector--
-              }
-            }
-          "
-        >
-          <img class="back" src="@/assets/Feed/arrow-right.svg"
-        /></a>
-      </div> -->
+      <a class="t-title">Калорий сегодня</a>
+      <a class="t-title right" @click="router.push('/history')"> Подробнее </a>
     </div>
     <div v-for="eat in eatingList" class="content" @click="$emit('open')">
       <div class="leftBlock">
         <div class="icon">
-          <img src="@/assets/Feed/pizza.svg" />
+          <img v-if="eat.type === 'food'" src="@/assets/Feed/pizza.svg" />
+          <img v-if="eat.type === 'weight'" src="@/assets/Feed/weight.svg" />
         </div>
         <div class="text">
           <p class="t-main" v-if="eat.type === 'food'">
@@ -66,12 +39,13 @@
 <script setup lang="ts">
 import axios from 'axios'
 import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
 import { useUser } from '@/store/User'
 const userStore = useUser()
 const API_BASE = import.meta.env.VITE_API_BASE
-
+const router = useRouter()
 const eatingList = ref<any[]>([])
 
 async function getCcalToday() {
@@ -128,13 +102,27 @@ function truncate(text: string | null | undefined, max = 26) {
     display: flex;
     justify-content: space-between;
     margin-left: 15px;
+    margin-right: 15px;
     margin-top: 8px;
-    padding-right: 15px;
 
     @media (width <=1000px) {
       margin-left: 5px;
+      margin-right: 5px;
       margin-top: 0;
-      padding-right: 5px;
+    }
+
+    .t-title {
+      display: block;
+
+      &.right {
+        color: $palette-blue;
+
+        &:hover {
+          cursor: pointer;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+        }
+      }
     }
   }
 

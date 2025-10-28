@@ -573,5 +573,25 @@
         "weight": 78.6
       }
     }
+  ],
+  "GET /users/me/favorites": [
+    {
+      "id": "cldemo_fav01",
+      "title": "Яичница с тостом",
+      "calories": 420,
+      "grams": 250
+    },
+    {
+      "id": "cldemo_fav02",
+      "title": "Куриный салат",
+      "calories": 560,
+      "grams": 400
+    },
+    {
+      "id": "cldemo_fav03",
+      "title": "Творог с медом",
+      "calories": 300,
+      "grams": 200
+    }
   ]
 }

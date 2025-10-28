@@ -14,7 +14,7 @@
           <a class="t-comment"
             >осталось
 
-            {{ ccalLimit - ccalToday }}
+            {{ (ccalLimit - ccalToday).toFixed(0) }}
             ккал</a
           >
 
@@ -37,7 +37,7 @@
           <a class="t-title">Вес</a>
           <a class="t-comment"
             >осталось
-            {{ lastWeight - desiredWeight }}
+            {{ (lastWeight - desiredWeight).toFixed(1) }}
             кг
           </a>
 

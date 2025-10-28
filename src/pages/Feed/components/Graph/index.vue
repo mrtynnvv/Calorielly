@@ -3,7 +3,7 @@
   <UiBlock class="ui-block">
     <div class="header">
       <a class="t-title">Динамика веса</a>
-      <a class="t-title right" @click="isOpen = true"> Добавить </a>
+      <a class="t-title right" @click="isOpen = true"> Обновить </a>
     </div>
 
     <div class="content">

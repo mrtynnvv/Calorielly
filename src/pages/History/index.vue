@@ -12,7 +12,8 @@
     <div v-for="item in items" class="content" @click="$emit('open')">
       <div class="leftBlock">
         <div class="icon">
-          <img src="@/assets/Feed/pizza.svg" />
+          <img v-if="item.type === 'food'" src="@/assets/Feed/pizza.svg" />
+          <img v-if="item.type === 'weight'" src="@/assets/Feed/weight.svg" />
         </div>
         <div class="text">
           <p class="t-main" v-if="item.type === 'food'">

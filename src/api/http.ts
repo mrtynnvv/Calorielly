@@ -170,6 +170,10 @@ function demoAdapter(original: any) {
         }))
         return ok(config, data)
       }
+
+      if (path.endsWith('/users/me/favorites')) {
+        return ok(config, db['GET /users/me/favorites'] || [])
+      }
     }
 
     // все остальное отдает в оригинальный адаптер на всякий случай

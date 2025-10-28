@@ -1,9 +1,11 @@
 <template>
   <UiModal :open="isOpen" @close="isOpen = false"><AddFoodModal /></UiModal>
   <UiBlock class="ui-block">
-    <a class="t-title">Калорий сегодня</a>
-
-    <div class="content" @click="isOpen = true">
+    <div class="header">
+      <a class="t-title">Калорий сегодня</a>
+      <a class="t-title right" @click="isOpen = true"> Добавить </a>
+    </div>
+    <div class="content" @click="router.push('/history')">
       <div class="leftBlock">
         <div class="icon">
           <img src="@/assets/Feed/fire.svg" />
@@ -23,6 +25,7 @@
 <script setup lang="ts">
 import axios from 'axios'
 import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import AddFoodModal from './components/AddFoodModal.vue'
 
@@ -31,7 +34,7 @@ import UiModal from '@/components/ui/UiModal.vue'
 import { useUser } from '@/store/User'
 const API_BASE = import.meta.env.VITE_API_BASE
 const userStore = useUser()
-
+const router = useRouter()
 const emit = defineEmits(['open'])
 const isOpen = ref(false)
 
@@ -83,14 +86,31 @@ watch(
 .ui-block {
   margin-bottom: 6px;
 
-  .t-title {
-    display: block;
+  .header {
+    display: flex;
+    justify-content: space-between;
     margin-left: 15px;
+    margin-right: 15px;
     margin-top: 8px;
 
     @media (width <=1000px) {
       margin-left: 5px;
+      margin-right: 5px;
       margin-top: 0;
+    }
+
+    .t-title {
+      display: block;
+
+      &.right {
+        color: $palette-blue;
+
+        &:hover {
+          cursor: pointer;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+        }
+      }
     }
   }
 

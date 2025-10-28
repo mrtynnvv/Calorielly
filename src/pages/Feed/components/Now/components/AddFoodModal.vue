@@ -131,7 +131,10 @@ async function getFavorite() {
         Authorization: `Bearer ${userStore.token}`,
       },
     })
-    favoriteList.value = data
+    //сортирвовка по количетсову калорий от большего к меньшему
+    favoriteList.value = [...data].sort(
+      (a, b) => Number(b.calories) - Number(a.calories),
+    )
     console.log(favoriteList)
   } catch (e) {
     console.log(e)
@@ -175,9 +178,6 @@ watch(
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   max-height: 99dvh;
-
-  // display: flex;
-  // flex-direction: column;
   min-height: 0;
   overflow: hidden;
 
@@ -219,6 +219,7 @@ watch(
       display: flex;
       gap: 8px;
       justify-content: space-between;
+      margin-bottom: 8px;
       transition: 0.5s;
 
       @media (width <=1000px) {
@@ -244,14 +245,15 @@ watch(
       .rightBlock {
         align-items: center;
         display: flex;
-        margin-bottom: 8px;
+        margin-bottom: auto;
         margin-right: -10px;
+        margin-top: auto;
 
         .ui-button-gray {
           align-items: center;
           font-size: 13px;
           margin: auto 7px;
-          max-height: 67%;
+          max-height: 30px;
           padding: 0 20px;
         }
 
