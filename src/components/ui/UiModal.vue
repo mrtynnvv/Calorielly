@@ -51,6 +51,7 @@ defineEmits<{ (e: 'close'): void }>()
 
   @media (width <=1000px) {
     inset: auto 0 0;
+      border-radius: 16px 16px 0px 0px;
   }
 
   .close {
