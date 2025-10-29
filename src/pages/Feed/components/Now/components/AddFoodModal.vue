@@ -48,12 +48,8 @@
         <div class="rightBlock">
           <UiButtonGray
             class="ui-button-gray"
-            text="Добавить"
-            @click="favoriteToInput(favorite)"
-          />
-          <img
-            src="@/assets/close-gray.svg"
-            @click="deleteFavorite(favorite.id)"
+            text="Открыть"
+            @click="emit('open-fav', favorite)"
           />
         </div>
       </div>
@@ -69,12 +65,13 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiButtonGray from '@/components/ui/UiButtonGray.vue'
 import UiInput from '@/components/ui/UiInput.vue'
 import { useUser } from '@/store/User'
+import { truncate } from '@/utils/truncate'
 const userStore = useUser()
 const API_BASE = import.meta.env.VITE_API_BASE
 
 type Favorite = { title: string; calories: number; grams: number; id: string }
 const favoriteList = ref<Favorite[]>([])
-
+const emit = defineEmits(['open-fav', 'close-all'])
 const ccalValue = ref(null)
 const ccalName = ref('')
 const grValue = ref(null)
@@ -98,6 +95,7 @@ async function addCcal() {
     ccalName.value = ''
     grValue.value = null
     userStore.feedRevision++
+    emit('close-all')
   } catch (e) {
     console.log(e)
   }
@@ -141,29 +139,6 @@ async function getFavorite() {
   }
 }
 getFavorite()
-
-function favoriteToInput(item: any) {
-  console.log(item)
-  ccalValue.value = item.calories
-  ccalName.value = item.title
-  grValue.value = item.grams
-}
-
-async function deleteFavorite(id: any) {
-  try {
-    await axios.delete(`${API_BASE}/users/me/entries/${id}`, {
-      headers: { Authorization: `Bearer ${userStore.token}` },
-    })
-    userStore.feedRevision++
-  } catch (e) {
-    console.log(e)
-  }
-}
-
-function truncate(text: string | null | undefined, max = 26) {
-  const s = (text ?? '').trim()
-  return s.length > max ? s.slice(0, max) + '...' : s
-}
 
 watch(
   () => userStore.feedRevision,
@@ -255,22 +230,6 @@ watch(
           margin: auto 7px;
           max-height: 30px;
           padding: 0 20px;
-        }
-
-        img {
-          align-items: center;
-          cursor: pointer;
-          transition: 1s;
-          width: 24px;
-
-          &:hover {
-            filter: brightness(1.1);
-            transition: 1s;
-          }
-
-          @media (width <=1000px) {
-            width: 20px;
-          }
         }
       }
     }

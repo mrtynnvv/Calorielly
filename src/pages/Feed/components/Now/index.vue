@@ -1,5 +1,14 @@
 <template>
-  <UiModal :open="isOpen" @close="isOpen = false"><AddFoodModal /></UiModal>
+  <UiModal :open="isOpen" @close="isOpen = false">
+    <AddFoodModal @open-fav="openFavFromAdd" @close-all="closeAll" />
+  </UiModal>
+  <UiModal :open="isOpenFavorite" @close="backToAdd">
+    <FavoriteDetailModal
+      :item="favPayload"
+      @close="backToAdd"
+      @close-all="closeAll"
+    />
+  </UiModal>
   <UiBlock class="ui-block">
     <div class="header">
       <a class="t-title">Калорий сегодня</a>
@@ -28,6 +37,7 @@ import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import AddFoodModal from './components/AddFoodModal.vue'
+import FavoriteDetailModal from './components/FavoriteDetailModal.vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
 import UiModal from '@/components/ui/UiModal.vue'
@@ -35,8 +45,26 @@ import { useUser } from '@/store/User'
 const API_BASE = import.meta.env.VITE_API_BASE
 const userStore = useUser()
 const router = useRouter()
-const emit = defineEmits(['open'])
+
 const isOpen = ref(false)
+const isOpenFavorite = ref(false)
+const favPayload = ref(null)
+
+function openFavFromAdd(payload: any) {
+  isOpen.value = false
+  favPayload.value = payload
+  isOpenFavorite.value = true
+}
+
+function backToAdd() {
+  isOpenFavorite.value = false
+  isOpen.value = true
+}
+
+function closeAll() {
+  isOpenFavorite.value = false
+  isOpen.value = false
+}
 
 const backTime = ref('')
 const upTime = ref(0)
