@@ -1,4 +1,7 @@
 <template>
+  <UiModal :open="isOpen" @close="isOpen = false">
+    <DetailModal :item="modalPayload" @close="isOpen = false" />
+  </UiModal>
   <UiBlock class="ui-block" v-for="(items, index) in days">
     <div class="header">
       <a class="t-title" v-if="items[index]">{{
@@ -9,7 +12,7 @@
         })
       }}</a>
     </div>
-    <div v-for="item in items" class="content" @click="$emit('open')">
+    <div v-for="item in items" class="content" @click="openModal(item.data)">
       <div class="leftBlock">
         <div class="icon">
           <img v-if="item.type === 'food'" src="@/assets/Feed/pizza.svg" />
@@ -35,8 +38,8 @@
           </p>
         </div>
       </div>
-      <div class="rightBlock" @click="deleteItem(item.data.id)">
-        <img src="@/assets/close-gray.svg" />
+      <div class="rightBlock">
+        <img src="@/assets/Feed/arrow-right.svg" />
       </div>
     </div>
   </UiBlock>
@@ -44,14 +47,25 @@
 
 <script setup lang="ts">
 import axios from 'axios'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+
+import DetailModal from './components/DetailModal.vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
 // import UiButton from '@/components/ui/UiButton.vue'
 // import UiInput from '@/components/ui/UiInput.vue'
+import UiModal from '@/components/ui/UiModal.vue'
 import { useUser } from '@/store/User'
+import { truncate } from '@/utils/truncate'
 const userStore = useUser()
 const API_BASE = import.meta.env.VITE_API_BASE
+const isOpen = ref(false)
+const modalPayload = ref(null)
+
+function openModal(item: any) {
+  isOpen.value = true
+  modalPayload.value = item
+}
 
 type Item = { id: string; type: 'food' | 'weight'; date: string; data: any }
 const days = ref<Item[][]>([])
@@ -86,21 +100,12 @@ function groupByLocalDay(items: Item[]): Item[][] {
     .map(([, arr]) => arr)
 }
 
-async function deleteItem(id: any) {
-  try {
-    await axios.delete(`${API_BASE}/users/me/entries/${id}`, {
-      headers: { Authorization: `Bearer ${userStore.token}` },
-    })
+watch(
+  () => userStore.feedRevision,
+  () => {
     load()
-  } catch (e) {
-    console.log(e)
-  }
-}
-
-function truncate(text: string | null | undefined, max = 26) {
-  const s = (text ?? '').trim()
-  return s.length > max ? s.slice(0, max) + '...' : s
-}
+  },
+)
 </script>
 
 <style scoped lang="scss">
@@ -178,6 +183,7 @@ function truncate(text: string | null | undefined, max = 26) {
   }
 
   .content {
+    cursor: pointer;
     display: flex;
     justify-content: space-between;
     margin-top: 8px;
@@ -188,12 +194,20 @@ function truncate(text: string | null | undefined, max = 26) {
       padding: 5px;
     }
 
+    &:hover {
+      background-color: $palette-bg;
+      border-radius: 8px;
+      transition: 0.5s;
+    }
+
     .leftBlock {
       align-items: center;
       display: flex;
 
       .icon {
-        padding: 8px 8px 8px 0;
+        background-color: $palette-bg;
+        border-radius: 100%;
+        padding: 8px;
 
         @media (width <=1000px) {
           padding: 7px;
@@ -212,10 +226,6 @@ function truncate(text: string | null | undefined, max = 26) {
         display: block;
         margin-left: 14px;
 
-        a {
-          color: #58636f;
-        }
-
         @media (width <=1000px) {
           margin-left: 10px;
         }
@@ -223,17 +233,10 @@ function truncate(text: string | null | undefined, max = 26) {
     }
 
     .rightBlock {
-      cursor: pointer;
       display: inline-flex;
 
       img {
-        transition: 1s;
         width: 24px;
-
-        &:hover {
-          filter: brightness(1.1);
-          transition: 1s;
-        }
 
         @media (width <=1000px) {
           width: 20px;
