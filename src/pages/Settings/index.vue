@@ -34,7 +34,7 @@ const ccal = ref<number | null>(null)
 
 async function editDesiredWeight() {
   try {
-    const { data } = await axios.patch(
+    await axios.patch(
       `${API_BASE}/users/me/desired-weight`,
       {
         value: weight.value,
@@ -45,7 +45,7 @@ async function editDesiredWeight() {
         },
       },
     )
-    console.log(data)
+    weight.value = null
   } catch (e) {
     console.log(e)
   }
@@ -53,7 +53,7 @@ async function editDesiredWeight() {
 
 async function editLimitCcal() {
   try {
-    const { data } = await axios.patch(
+    await axios.patch(
       `${API_BASE}/users/me/calorie-limit`,
       {
         value: ccal.value,
@@ -64,7 +64,7 @@ async function editLimitCcal() {
         },
       },
     )
-    console.log(data)
+    ccal.value = null
   } catch (e) {
     console.log(e)
   }
