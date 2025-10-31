@@ -16,23 +16,34 @@
         <div class="text"><a>Вход</a> <a>Регистрация</a></div>
       </div>
 
-      <EnterStep1 v-if="steps === 'enter'" />
-      <RegisterStep1
-        v-if="steps === 'reg1'"
-        @send-value="login = $event"
-        @change-step="onChangeStep"
-      />
-      <RegisterStep2
-        v-if="steps === 'reg2'"
-        :login="login"
-        @change-step="onChangeStep"
-      />
+      <div
+        class="anim-wrapper"
+        :style="{
+          height: showHeight,
+          overflow: 'hidden',
+          transition: 'height .3s ease',
+        }"
+      >
+        <div ref="inner">
+          <EnterStep1 v-if="steps === 'enter'" />
+          <RegisterStep1
+            v-if="steps === 'reg1'"
+            @send-value="login = $event"
+            @change-step="onChangeStep"
+          />
+          <RegisterStep2
+            v-if="steps === 'reg2'"
+            :login="login"
+            @change-step="onChangeStep"
+          />
+        </div>
+      </div>
     </UiBlock>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 import EnterStep1 from './components/EnterStep1.vue'
 import RegisterStep1 from './components/RegisterStep1.vue'
@@ -41,7 +52,8 @@ import RegisterStep2 from './components/RegisterStep2.vue'
 import UiBlock from '@/components/ui/UiBlock.vue'
 
 const login = ref<string>('')
-
+const inner = ref<HTMLDivElement | null>(null)
+const showHeight = ref('0px')
 type Step = 'reg1' | 'reg2' | 'enter'
 const steps = ref<Step>('reg1')
 const switchAuth = () => {
@@ -54,9 +66,31 @@ const onChangeStep = (s: Step | string) => {
 //белый фон только на /auth
 onMounted(() => document.documentElement.classList.add('auth-white'))
 onBeforeUnmount(() => document.documentElement.classList.remove('auth-white'))
+
+//плавная перерисовка размеров блока при клике
+onMounted(() => {
+  const updateHeight = async () => {
+    if (!inner.value) return
+    await nextTick()
+    showHeight.value = inner.value.scrollHeight + 'px'
+  }
+
+  //высота после рендера
+  updateHeight()
+
+  document.addEventListener('click', updateHeight)
+
+  onBeforeUnmount(() => {
+    document.removeEventListener('click', updateHeight)
+  })
+})
 </script>
 
 <style scoped lang="scss">
+.anim-wrapper {
+  width: 100%;
+}
+
 .main {
   align-items: center;
   display: flex;
