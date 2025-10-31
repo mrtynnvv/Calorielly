@@ -60,7 +60,9 @@
                 class="lineBlue"
                 :style="{
                   width:
-                    Math.min((desiredWeight / lastWeight) * 100, 100) + '%',
+                    (desiredWeight / lastWeight) * 100 > 100
+                      ? (lastWeight / desiredWeight) * 100 + '%'
+                      : (desiredWeight / lastWeight) * 100 + '%',
                 }"
               ></div>
             </div>
@@ -260,8 +262,6 @@ onMounted(async () => {
 
         img {
           width: 18px;
-
-          // height: 16px;
         }
       }
 
