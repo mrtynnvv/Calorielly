@@ -11,20 +11,19 @@
         </div>
         <div class="description">
           <a class="t-title">Калории</a>
-          <a class="t-comment"
-            >осталось
+          <a class="t-comment" v-if="(ccalLimit - ccalToday) < 0">переедено
+
+            {{ Math.abs(ccalLimit - ccalToday).toFixed(0) }}
+            ккал</a>
+          <a v-else class="t-comment">осталось
 
             {{ (ccalLimit - ccalToday).toFixed(0) }}
-            ккал</a
-          >
+            ккал</a>
 
           <div class="line">
-            <div
-              class="lineBlue"
-              :style="{
-                width: (ccalToday / ccalLimit) * 100 + '%',
-              }"
-            ></div>
+            <div class="lineBlue" :style="{
+              width: Math.min((ccalToday / ccalLimit) * 100, 100) + '%',
+            }"></div>
           </div>
         </div>
       </UiBlock>
@@ -35,19 +34,15 @@
         </div>
         <div class="description">
           <a class="t-title">Вес</a>
-          <a class="t-comment"
-            >осталось
-            {{ (lastWeight - desiredWeight).toFixed(1) }}
+          <a class="t-comment">осталось
+            {{ Math.abs((lastWeight - desiredWeight)).toFixed(1) }}
             кг
           </a>
 
           <div class="line">
-            <div
-              class="lineBlue"
-              :style="{
-                width: (desiredWeight / lastWeight) * 100 + '%',
-              }"
-            ></div>
+            <div class="lineBlue" :style="{
+              width: Math.min((desiredWeight / lastWeight) * 100, 100) + '%',
+            }"></div>
           </div>
         </div>
       </UiBlock>
