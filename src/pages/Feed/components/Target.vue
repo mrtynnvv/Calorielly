@@ -3,56 +3,77 @@
     <div class="header">
       <a class="t-title">Цели</a>
     </div>
-
-    <div class="content">
-      <UiBlock class="card">
-        <div class="image">
-          <img src="@/assets/Feed/cookie.svg" />
+    <div class="content-wrap">
+      <div class="arrows">
+        <div class="leftArrow" v-show="!atStart" @click.stop="scrollToStart()">
+          <img @load="updateArrows" src="@/assets/Feed/angle-left.svg" />
         </div>
-        <div class="description">
-          <a class="t-title">Калории</a>
-          <a class="t-comment" v-if="(ccalLimit - ccalToday) < 0">переедено
-
-            {{ Math.abs(ccalLimit - ccalToday).toFixed(0) }}
-            ккал</a>
-          <a v-else class="t-comment">осталось
-
-            {{ (ccalLimit - ccalToday).toFixed(0) }}
-            ккал</a>
-
-          <div class="line">
-            <div class="lineBlue" :style="{
-              width: Math.min((ccalToday / ccalLimit) * 100, 100) + '%',
-            }"></div>
+        <div class="rightArrow" v-show="!atEnd" @click.stop="scrollToEnd()">
+          <img @load="updateArrows" src="@/assets/Feed/angle-right.svg" />
+        </div>
+      </div>
+      <div class="content" ref="contentRef" @scroll.passive="updateArrows">
+        <UiBlock class="card">
+          <div class="image">
+            <img src="@/assets/Feed/cookie.svg" />
           </div>
-        </div>
-      </UiBlock>
+          <div class="description">
+            <a class="t-title">Калории</a>
+            <a class="t-comment" v-if="ccalLimit - ccalToday < 0"
+              >переедено
 
-      <UiBlock class="card">
-        <div class="image">
-          <img src="@/assets/Feed/cookie.svg" />
-        </div>
-        <div class="description">
-          <a class="t-title">Вес</a>
-          <a class="t-comment">осталось
-            {{ Math.abs((lastWeight - desiredWeight)).toFixed(1) }}
-            кг
-          </a>
+              {{ Math.abs(ccalLimit - ccalToday).toFixed(0) }}
+              ккал</a
+            >
+            <a v-else class="t-comment"
+              >осталось
 
-          <div class="line">
-            <div class="lineBlue" :style="{
-              width: Math.min((desiredWeight / lastWeight) * 100, 100) + '%',
-            }"></div>
+              {{ (ccalLimit - ccalToday).toFixed(0) }}
+              ккал</a
+            >
+
+            <div class="line">
+              <div
+                class="lineBlue"
+                :style="{
+                  width: Math.min((ccalToday / ccalLimit) * 100, 100) + '%',
+                }"
+              ></div>
+            </div>
           </div>
-        </div>
-      </UiBlock>
+        </UiBlock>
+
+        <UiBlock class="card">
+          <div class="image">
+            <img src="@/assets/Feed/cookie.svg" />
+          </div>
+          <div class="description">
+            <a class="t-title">Вес</a>
+            <a class="t-comment"
+              >осталось
+              {{ Math.abs(lastWeight - desiredWeight).toFixed(1) }}
+              кг
+            </a>
+
+            <div class="line">
+              <div
+                class="lineBlue"
+                :style="{
+                  width:
+                    Math.min((desiredWeight / lastWeight) * 100, 100) + '%',
+                }"
+              ></div>
+            </div>
+          </div>
+        </UiBlock>
+      </div>
     </div>
   </UiBlock>
 </template>
 
 <script setup lang="ts">
 import axios from 'axios'
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
 import { useUser } from '@/store/User'
@@ -64,6 +85,40 @@ const ccalToday = ref(0)
 const ccalLimit = ref(0)
 const desiredWeight = ref(0)
 const lastWeight = ref(0)
+const contentRef = ref<HTMLDivElement | null>(null)
+const atStart = ref(true)
+const atEnd = ref(false)
+
+const updateArrows = () => {
+  const el = contentRef.value
+  if (!el) return
+  const cards = el.querySelectorAll('.card')
+  if (!cards.length) {
+    atStart.value = true
+    atEnd.value = true
+    return
+  }
+
+  const cont = el.getBoundingClientRect()
+  const first = (cards[0] as HTMLElement).getBoundingClientRect()
+  const last = (cards[cards.length - 1] as HTMLElement).getBoundingClientRect()
+  const EPS = 1 // допуск на сабпиксели
+
+  atStart.value = first.left >= cont.left - EPS // первый полностью у левого края
+  atEnd.value = last.right <= cont.right + EPS // последний полностью у правого края
+}
+const scrollToStart = () => {
+  const el = contentRef.value
+  if (!el) return
+  el.scrollTo({ left: 0, behavior: 'smooth' })
+}
+
+const scrollToEnd = () => {
+  const el = contentRef.value
+  if (!el) return
+  const max = el.scrollWidth - el.clientWidth
+  el.scrollTo({ left: max, behavior: 'smooth' })
+}
 
 async function getCcalToday() {
   try {
@@ -140,6 +195,15 @@ watch(
     getCcalToday(), getLastWeight()
   },
 )
+
+onMounted(async () => {
+  await nextTick()
+  requestAnimationFrame(updateArrows)
+  setTimeout(updateArrows, 100)
+  const ro = new ResizeObserver(updateArrows)
+  if (contentRef.value) ro.observe(contentRef.value)
+  onBeforeUnmount(() => ro.disconnect())
+})
 </script>
 
 <style scoped lang="scss">
@@ -159,73 +223,131 @@ watch(
     }
   }
 
-  .content {
-    display: flex;
-    flex-wrap: nowrap;
-    margin-top: 8px;
-    max-width: 100%;
-    min-width: 0;
-    overflow-x: auto;
-    padding: 8px 10px 5px 15px;
-    white-space: nowrap;
-    width: 100%;
+  .content-wrap {
+    position: relative;
 
-    @media (width <=1000px) {
-      padding: 5px 5px 0;
-    }
+    .arrows {
+      display: flex;
+      justify-content: space-between;
+      left: 0;
+      padding: 0 10px;
+      pointer-events: none;
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2;
 
-    &::-webkit-scrollbar {
-      display: none;
-    }
-
-    .card {
-      background-color: $palette-bg;
-      border: none;
-      display: inline-grid;
-      flex: 0 0 auto;
-      grid-template-columns: max-content 1fr;
-      margin-right: 8px;
-      padding: 14px;
-      white-space: normal;
-
-      .image {
+      .leftArrow,
+      .rightArrow {
         align-items: center;
-        background-color: #fff;
-        border-radius: 100%;
-        display: flex;
-        margin-right: 10px;
-        padding: 5px;
+        background-color: rgb(255 255 255 / 70%);
+        border: 1px solid rgb(0 0 0 / 1%);
+        border-radius: 9999px;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 1%);
+        display: inline-flex;
+        height: 36px;
+        justify-content: center;
+        pointer-events: all;
+        transition: 0.2s;
+        width: 36px;
 
-        @media (width <=1000px) {
-          padding: 4px;
+        &:hover {
+          background-color: rgb(255 255 255 / 100%);
+          cursor: pointer;
+          transition: 0.2s;
         }
 
         img {
-          width: 32px;
+          width: 18px;
 
-          @media (width <=1000px) {
-            width: 28px;
-          }
+          // height: 16px;
         }
       }
 
-      .description {
-        margin-right: 8px;
+      .leftArrow {
+        left: 8px;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+      }
 
-        .t-comment {
-          margin-left: 8px;
+      .rightArrow {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+    }
+
+    .content {
+      display: flex;
+      flex-wrap: nowrap;
+      margin-top: 8px;
+      max-width: 100%;
+      min-width: 0;
+      overflow-x: auto;
+      padding: 8px 10px 5px 15px;
+      white-space: nowrap;
+      width: 100%;
+
+      @media (width <=1000px) {
+        padding: 5px 5px 0;
+      }
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+
+      .card {
+        background-color: $palette-bg;
+        border: none;
+        display: inline-grid;
+        flex: 0 0 auto;
+        grid-template-columns: max-content 1fr;
+        margin-right: 8px;
+        padding: 14px;
+        white-space: normal;
+
+        .image {
+          align-items: center;
+          background-color: #fff;
+          border-radius: 100%;
+          display: flex;
+          margin-right: 10px;
+          padding: 5px;
+
+          @media (width <=1000px) {
+            padding: 4px;
+          }
+
+          img {
+            width: 32px;
+
+            @media (width <=1000px) {
+              width: 28px;
+            }
+          }
         }
 
-        .line {
-          background-color: #fff;
-          border-radius: 9999px;
-          height: 4px;
-          margin-top: 6px;
+        .description {
+          margin-right: 8px;
 
-          .lineBlue {
-            background-color: #2688eb;
+          .t-comment {
+            margin-left: 8px;
+          }
+
+          .line {
+            background-color: #fff;
             border-radius: 9999px;
-            height: 100%;
+            height: 4px;
+            margin-top: 6px;
+
+            .lineBlue {
+              background-color: #2688eb;
+              border-radius: 9999px;
+              height: 100%;
+            }
           }
         }
       }
