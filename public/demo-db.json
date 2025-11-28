@@ -58,168 +58,147 @@
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-18T08:30:00.000Z",
       "title": "Овсянка с бананом",
-      "calories": 380,
-      "grams": 320
+      "calories": 380
     },
     {
       "id": "cldemo_f02",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-18T13:00:00.000Z",
       "title": "Салат с курицей",
-      "calories": 650,
-      "grams": 450
+      "calories": 650
     },
     {
       "id": "cldemo_f03",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-18T19:30:00.000Z",
       "title": "Лосось с рисом",
-      "calories": 820,
-      "grams": 520
+      "calories": 820
     },
     {
       "id": "cldemo_f04",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-19T08:30:00.000Z",
       "title": "Омлет с овощами",
-      "calories": 420,
-      "grams": 300
+      "calories": 420
     },
     {
       "id": "cldemo_f05",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-19T13:00:00.000Z",
       "title": "Боул с индейкой",
-      "calories": 700,
-      "grams": 500
+      "calories": 700
     },
     {
       "id": "cldemo_f06",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-19T19:30:00.000Z",
       "title": "Паста с тунцом",
-      "calories": 900,
-      "grams": 600
+      "calories": 900
     },
     {
       "id": "cldemo_f07",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-20T08:30:00.000Z",
       "title": "Гречка с яйцом",
-      "calories": 360,
-      "grams": 280
+      "calories": 360
     },
     {
       "id": "cldemo_f08",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-20T13:00:00.000Z",
       "title": "Суп чечевичный",
-      "calories": 540,
-      "grams": 400
+      "calories": 540
     },
     {
       "id": "cldemo_f09",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-20T19:30:00.000Z",
       "title": "Курица с овощами",
-      "calories": 880,
-      "grams": 550
+      "calories": 880
     },
     {
       "id": "cldemo_f10",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-21T08:30:00.000Z",
       "title": "Творог с ягодами",
-      "calories": 300,
-      "grams": 250
+      "calories": 300
     },
     {
       "id": "cldemo_f11",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-21T13:00:00.000Z",
       "title": "Говядина с гречкой",
-      "calories": 720,
-      "grams": 500
+      "calories": 720
     },
     {
       "id": "cldemo_f12",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-21T19:30:00.000Z",
       "title": "Рис с овощами и яйцом",
-      "calories": 830,
-      "grams": 560
+      "calories": 830
     },
     {
       "id": "cldemo_f13",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-22T08:30:00.000Z",
       "title": "Смузи шпинат-банан",
-      "calories": 280,
-      "grams": 350
+      "calories": 280
     },
     {
       "id": "cldemo_f14",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-22T13:00:00.000Z",
       "title": "Лапша рисовая с курицей",
-      "calories": 690,
-      "grams": 520
+      "calories": 690
     },
     {
       "id": "cldemo_f15",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-22T19:30:00.000Z",
       "title": "Стейк с картофелем",
-      "calories": 940,
-      "grams": 620
+      "calories": 940
     },
     {
       "id": "cldemo_f16",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-23T08:30:00.000Z",
       "title": "Йогурт и мюсли",
-      "calories": 330,
-      "grams": 280
+      "calories": 330
     },
     {
       "id": "cldemo_f17",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-23T13:00:00.000Z",
       "title": "Тунец с овощами",
-      "calories": 640,
-      "grams": 480
+      "calories": 640
     },
     {
       "id": "cldemo_f18",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-23T19:30:00.000Z",
       "title": "Курица карри с рисом",
-      "calories": 860,
-      "grams": 550
+      "calories": 860
     },
     {
       "id": "cldemo_f19",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-24T08:30:00.000Z",
       "title": "Овсяноблин с творогом",
-      "calories": 370,
-      "grams": 300
+      "calories": 370
     },
     {
       "id": "cldemo_f20",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-24T13:00:00.000Z",
       "title": "Буррито с индейкой",
-      "calories": 710,
-      "grams": 520
+      "calories": 710
     },
     {
       "id": "cldemo_f21",
       "userId": "cl_demo_user_00001",
       "eatenAt": "2025-10-24T19:30:00.000Z",
       "title": "Лосось на гриле",
-      "calories": 880,
-      "grams": 540
+      "calories": 880
     }
   ],
   "GET /users/me/timeline": [
@@ -232,8 +211,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-24T19:30:00.000Z",
         "title": "Лосось на гриле",
-        "calories": 880,
-        "grams": 540
+        "calories": 880
       }
     },
     {
@@ -245,8 +223,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-24T13:00:00.000Z",
         "title": "Буррито с индейкой",
-        "calories": 710,
-        "grams": 520
+        "calories": 710
       }
     },
     {
@@ -258,8 +235,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-24T08:30:00.000Z",
         "title": "Овсяноблин с творогом",
-        "calories": 370,
-        "grams": 300
+        "calories": 370
       }
     },
     {
@@ -282,8 +258,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-23T19:30:00.000Z",
         "title": "Курица карри с рисом",
-        "calories": 860,
-        "grams": 550
+        "calories": 860
       }
     },
     {
@@ -295,8 +270,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-23T13:00:00.000Z",
         "title": "Тунец с овощами",
-        "calories": 640,
-        "grams": 480
+        "calories": 640
       }
     },
     {
@@ -308,8 +282,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-23T08:30:00.000Z",
         "title": "Йогурт и мюсли",
-        "calories": 330,
-        "grams": 280
+        "calories": 330
       }
     },
     {
@@ -332,8 +305,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-22T19:30:00.000Z",
         "title": "Стейк с картофелем",
-        "calories": 940,
-        "grams": 620
+        "calories": 940
       }
     },
     {
@@ -345,8 +317,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-22T13:00:00.000Z",
         "title": "Лапша рисовая с курицей",
-        "calories": 690,
-        "grams": 520
+        "calories": 690
       }
     },
     {
@@ -358,8 +329,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-22T08:30:00.000Z",
         "title": "Смузи шпинат-банан",
-        "calories": 280,
-        "grams": 350
+        "calories": 280
       }
     },
     {
@@ -382,8 +352,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-21T19:30:00.000Z",
         "title": "Рис с овощами и яйцом",
-        "calories": 830,
-        "grams": 560
+        "calories": 830
       }
     },
     {
@@ -395,8 +364,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-21T13:00:00.000Z",
         "title": "Говядина с гречкой",
-        "calories": 720,
-        "grams": 500
+        "calories": 720
       }
     },
     {
@@ -408,8 +376,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-21T08:30:00.000Z",
         "title": "Творог с ягодами",
-        "calories": 300,
-        "grams": 250
+        "calories": 300
       }
     },
     {
@@ -432,8 +399,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-20T19:30:00.000Z",
         "title": "Курица с овощами",
-        "calories": 880,
-        "grams": 550
+        "calories": 880
       }
     },
     {
@@ -445,8 +411,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-20T13:00:00.000Z",
         "title": "Суп чечевичный",
-        "calories": 540,
-        "grams": 400
+        "calories": 540
       }
     },
     {
@@ -458,8 +423,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-20T08:30:00.000Z",
         "title": "Гречка с яйцом",
-        "calories": 360,
-        "grams": 280
+        "calories": 360
       }
     },
     {
@@ -482,8 +446,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-19T19:30:00.000Z",
         "title": "Паста с тунцом",
-        "calories": 900,
-        "grams": 600
+        "calories": 900
       }
     },
     {
@@ -495,8 +458,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-19T13:00:00.000Z",
         "title": "Боул с индейкой",
-        "calories": 700,
-        "grams": 500
+        "calories": 700
       }
     },
     {
@@ -508,8 +470,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-19T08:30:00.000Z",
         "title": "Омлет с овощами",
-        "calories": 420,
-        "grams": 300
+        "calories": 420
       }
     },
     {
@@ -532,8 +493,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-18T19:30:00.000Z",
         "title": "Лосось с рисом",
-        "calories": 820,
-        "grams": 520
+        "calories": 820
       }
     },
     {
@@ -545,8 +505,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-18T13:00:00.000Z",
         "title": "Салат с курицей",
-        "calories": 650,
-        "grams": 450
+        "calories": 650
       }
     },
     {
@@ -558,8 +517,7 @@
         "userId": "cl_demo_user_00001",
         "eatenAt": "2025-10-18T08:30:00.000Z",
         "title": "Овсянка с бананом",
-        "calories": 380,
-        "grams": 320
+        "calories": 380
       }
     },
     {
@@ -578,20 +536,17 @@
     {
       "id": "cldemo_fav01",
       "title": "Яичница с тостом",
-      "calories": 420,
-      "grams": 250
+      "calories": 420
     },
     {
       "id": "cldemo_fav02",
       "title": "Куриный салат",
-      "calories": 560,
-      "grams": 400
+      "calories": 560
     },
     {
       "id": "cldemo_fav03",
       "title": "Творог с медом",
-      "calories": 300,
-      "grams": 200
+      "calories": 300
     }
   ]
 }

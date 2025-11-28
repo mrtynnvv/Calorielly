@@ -10,12 +10,8 @@
       <p class="t-main">{{ ccalValue }} ккал</p>
     </div>
     <div class="text">
-      <p class="t-comment">Вес</p>
-      <p class="t-main">{{ grValue }} гр</p>
-    </div>
-    <div class="text">
       <p class="t-comment">Описание</p>
-      <p class="t-main">{{ ccalName }} ккал</p>
+      <p class="t-main">{{ ccalName }}</p>
     </div>
 
     <UiButton class="ui-button" @click="addCcal" text="Добавить в меню" />
@@ -39,13 +35,12 @@ const userStore = useUser()
 const API_BASE = import.meta.env.VITE_API_BASE
 
 const props = defineProps<{
-  item: { id: string; title: string; calories: number; grams: number } | null
+  item: { id: string; title: string; calories: number } | null
 }>()
 
 const idValue = ref<string>('')
 const ccalValue = ref<number | null>(null)
 const ccalName = ref<string>('')
-const grValue = ref<number | null>(null)
 const emit = defineEmits(['close', 'close-all'])
 
 async function addCcal() {
@@ -55,7 +50,6 @@ async function addCcal() {
       {
         title: ccalName.value,
         calories: ccalValue.value,
-        grams: grValue.value,
       },
       {
         headers: {
@@ -89,7 +83,6 @@ watch(
     if (v) {
       ccalName.value = v.title
       ccalValue.value = v.calories
-      grValue.value = v.grams
       idValue.value = v.id
     }
   },

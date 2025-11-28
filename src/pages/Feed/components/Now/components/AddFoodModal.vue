@@ -8,12 +8,6 @@
         v-model.number="ccalValue"
         type="number"
       />
-      <div class="nameInput">Вес</div>
-      <UiInput
-        placeholder="Введите количество грамм"
-        v-model.number="grValue"
-        type="number"
-      />
       <div class="nameInput">Название</div>
       <UiInput
         placeholder="Введите название продукта"
@@ -37,7 +31,6 @@
           <div class="text">
             <p class="t-main">
               {{ favorite.calories }} ккал
-              <a> {{ favorite.grams }} гр</a>
             </p>
 
             <p class="t-comment">
@@ -69,12 +62,11 @@ import { truncate } from '@/utils/truncate'
 const userStore = useUser()
 const API_BASE = import.meta.env.VITE_API_BASE
 
-type Favorite = { title: string; calories: number; grams: number; id: string }
+type Favorite = { title: string; calories: number; id: string }
 const favoriteList = ref<Favorite[]>([])
 const emit = defineEmits(['open-fav', 'close-all'])
 const ccalValue = ref(null)
 const ccalName = ref('')
-const grValue = ref(null)
 
 async function addCcal() {
   try {
@@ -83,7 +75,6 @@ async function addCcal() {
       {
         title: ccalName.value,
         calories: ccalValue.value,
-        grams: grValue.value,
       },
       {
         headers: {
@@ -93,7 +84,6 @@ async function addCcal() {
     )
     ccalValue.value = null
     ccalName.value = ''
-    grValue.value = null
     userStore.feedRevision++
     emit('close-all')
   } catch (e) {
@@ -108,7 +98,6 @@ async function addToFavorite() {
       {
         title: ccalName.value,
         calories: ccalValue.value,
-        grams: grValue.value,
       },
       {
         headers: {

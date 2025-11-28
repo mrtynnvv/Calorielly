@@ -14,13 +14,9 @@
       <p class="t-comment">Калорийность</p>
       <p class="t-main">{{ ccalValue }} ккал</p>
     </div>
-    <div class="text" v-if="grValue">
-      <p class="t-comment">Вес</p>
-      <p class="t-main">{{ grValue }} гр</p>
-    </div>
     <div class="text" v-if="ccalName">
       <p class="t-comment">Описание</p>
-      <p class="t-main">{{ ccalName }} ккал</p>
+      <p class="t-main">{{ ccalName }}</p>
     </div>
     <div class="text" v-if="measuredValue">
       <p class="t-comment">Дата</p>
@@ -63,7 +59,6 @@ const props = defineProps<{
     id: string
     title: string
     calories: number
-    grams: number
     weight: number
     measuredAt: string
   } | null
@@ -72,7 +67,6 @@ const props = defineProps<{
 const idValue = ref<string>('')
 const ccalValue = ref<number | null>(null)
 const ccalName = ref<string>('')
-const grValue = ref<number | null>(null)
 const weightValue = ref<number | null>(null)
 const measuredValue = ref<string>('')
 const emit = defineEmits(['close'])
@@ -96,7 +90,6 @@ watch(
     if (v) {
       ccalName.value = v.title
       ccalValue.value = v.calories
-      grValue.value = v.grams
       idValue.value = v.id
       weightValue.value = v.weight
       measuredValue.value = v.measuredAt

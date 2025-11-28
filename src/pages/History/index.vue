@@ -21,7 +21,7 @@
         <div class="text">
           <p class="t-main" v-if="item.type === 'food'">
             {{ truncate(item.data.title, 16) }}
-            <a>{{ item.data.calories }} ккал {{ item.data.grams }} гр</a>
+            <a>{{ item.data.calories }} ккал</a>
           </p>
           <p class="t-main" v-else>
             Обновлен вес
