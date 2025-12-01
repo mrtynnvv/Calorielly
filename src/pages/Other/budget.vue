@@ -35,7 +35,9 @@
         <div class="card">
           <div class="card-label">По плану должно остаться</div>
           <div class="card-value">{{ fmtMoney(shouldRemain) }} ₽</div>
-          <div class="card-sub">День {{ currentDayNumber }} из {{ totalDays }}</div>
+          <div class="card-sub">
+            День {{ currentDayNumber }} из {{ totalDays }}
+          </div>
         </div>
         <div class="card">
           <div class="card-label">
@@ -44,7 +46,8 @@
           </div>
           <div class="card-value">{{ fmtMoney(dailyFromNow) }} ₽</div>
           <div class="card-sub">
-            Осталось {{ remainingDays === 0 ? '0' : remainingDays }} дн. до выплаты
+            Осталось {{ remainingDays === 0 ? '0' : remainingDays }} дн. до
+            выплаты
           </div>
         </div>
       </div>
@@ -54,7 +57,9 @@
           {{ delta >= 0 ? 'Вы в плюсе по плану' : 'Перерасход' }}
         </div>
         <div class="status-text">
-          {{ delta >= 0 ? 'Запас относительно плана:' : 'Нужно вернуть в план:' }}
+          {{
+            delta >= 0 ? 'Запас относительно плана:' : 'Нужно вернуть в план:'
+          }}
           {{ fmtMoney(Math.abs(delta)) }} ₽
         </div>
       </div>
@@ -65,7 +70,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-const START_AMOUNT = 45_000 
+const START_AMOUNT = 45_000
 const PAYDAY_DAY = 15
 
 const balance = ref<number>(START_AMOUNT)
@@ -128,8 +133,8 @@ const elapsedDays = computed<number>(() =>
   Math.min(totalDays.value, diffDays(cycleStart.value, now.value)),
 )
 
-const remainingDays = computed<number>(
-  () => Math.max(0, totalDays.value - elapsedDays.value),
+const remainingDays = computed<number>(() =>
+  Math.max(0, totalDays.value - elapsedDays.value),
 )
 
 const dailyPlanned = computed<number>(() => START_AMOUNT / totalDays.value)
@@ -299,7 +304,7 @@ function fmtDate(d: Date): string {
   font-size: 14px;
 }
 
-@media (max-width: 520px) {
+@media (width <= 520px) {
   .panel {
     padding: 18px 16px;
   }

@@ -3,14 +3,19 @@
     <UiBlock class="ui-block">
       <img src="@/assets/logo.svg" />
       <p class="t-title-XL">
-        <a v-if="steps === 'enter'">Вход</a> <a v-else>Регистрация</a> в
-        Calorielly
+        <a v-if="steps === 'enter' || steps === 'enterPassword'">Вход</a>
+        <a v-else>Регистрация</a> в Calorielly
       </p>
-      <div class="switcher" v-if="steps === 'reg1' || steps === 'enter'">
+      <div
+        class="switcher"
+        v-if="
+          steps === 'reg1' || steps === 'enter' || steps === 'enterPassword'
+        "
+      >
         <div class="activeButton" :class="{ active: steps === 'reg1' }"></div>
         <div
           class="disabledButton"
-          :class="{ active: steps === 'enter' }"
+          :class="{ active: steps === 'enter' || steps === 'enterPassword' }"
           @click="switchAuth"
         ></div>
         <div class="text"><a>Вход</a> <a>Регистрация</a></div>
@@ -25,7 +30,10 @@
         }"
       >
         <div ref="inner">
-          <EnterStep1 v-if="steps === 'enter'" />
+          <EnterStep1
+            v-if="steps === 'enter' || steps === 'enterPassword'"
+            @change-step="onChangeStep"
+          />
           <RegisterStep1
             v-if="steps === 'reg1'"
             @send-value="login = $event"
@@ -43,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 
 import EnterStep1 from './components/EnterStep1.vue'
 import RegisterStep1 from './components/RegisterStep1.vue'
@@ -54,7 +62,7 @@ import UiBlock from '@/components/ui/UiBlock.vue'
 const login = ref<string>('')
 const inner = ref<HTMLDivElement | null>(null)
 const showHeight = ref('0px')
-type Step = 'reg1' | 'reg2' | 'enter'
+type Step = 'reg1' | 'reg2' | 'enter' | 'enterPassword'
 const steps = ref<Step>('reg1')
 const switchAuth = () => {
   steps.value === 'reg1' ? (steps.value = 'enter') : (steps.value = 'reg1')
@@ -67,23 +75,21 @@ const onChangeStep = (s: Step | string) => {
 onMounted(() => document.documentElement.classList.add('auth-white'))
 onBeforeUnmount(() => document.documentElement.classList.remove('auth-white'))
 
-//плавная перерисовка размеров блока при клике
+//пересчет высоты блока при изменении шага
+const updateHeight = async () => {
+  if (!inner.value) return
+  await nextTick()
+  showHeight.value = inner.value.scrollHeight + 'px'
+}
 onMounted(() => {
-  const updateHeight = async () => {
-    if (!inner.value) return
-    await nextTick()
-    showHeight.value = inner.value.scrollHeight + 'px'
-  }
-
-  //высота после рендера
   updateHeight()
-
-  document.addEventListener('click', updateHeight)
-
-  onBeforeUnmount(() => {
-    document.removeEventListener('click', updateHeight)
-  })
 })
+watch(
+  () => steps.value,
+  () => {
+    updateHeight()
+  },
+)
 </script>
 
 <style scoped lang="scss">

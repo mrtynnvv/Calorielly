@@ -1,18 +1,19 @@
 <template>
-  <UiInput v-model="login" placeholder="+7 000 000 00 00" />
-  <UiInput
-    class="pass"
-    v-if="showPasswordInput"
-    type="password"
-    v-model="password"
-    placeholder="Введите пароль"
-  />
-  <UiButton
-    v-if="!showPasswordInput"
-    text="Продолжить"
-    @click="openPasswordInput"
-  />
-  <UiButton v-if="showPasswordInput" text="Войти" @click="enter" />
+  <form @submit.prevent="onSubmit">
+    <UiInput v-model="login" placeholder="+7 000 000 00 00" />
+    <UiInput
+      class="pass"
+      v-if="showPasswordInput"
+      type="password"
+      v-model="password"
+      placeholder="Введите пароль"
+    />
+
+    <UiButton
+      type="submit"
+      :text="showPasswordInput ? 'Войти' : 'Продолжить'"
+    />
+  </form>
 </template>
 
 <script setup lang="ts">
@@ -26,15 +27,22 @@ import { useUser } from '@/store/User'
 const API_BASE = import.meta.env.VITE_API_BASE
 const userStore = useUser()
 const router = useRouter()
-
+const emit = defineEmits<{
+  (e: 'change-step', value: string): void
+}>()
 const login = ref('+7')
 const password = ref('')
 const showPasswordInput = ref(false)
-function openPasswordInput() {
+function onSubmit() {
   //включает инпут пароля
-  if (login.value.length === 12) {
-    showPasswordInput.value = true
+  if (!showPasswordInput.value) {
+    if (login.value.length === 12) {
+      showPasswordInput.value = true
+      emit('change-step', 'enterPassword')
+    }
+    return
   }
+  enter() //если инпут включен - запрос на бэк
 }
 async function enter() {
   try {

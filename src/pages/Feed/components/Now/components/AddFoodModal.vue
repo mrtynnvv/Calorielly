@@ -29,9 +29,7 @@
       <div class="content" v-for="favorite in favoriteList">
         <div class="leftBlock">
           <div class="text">
-            <p class="t-main">
-              {{ favorite.calories }} ккал
-            </p>
+            <p class="t-main">{{ favorite.calories }} ккал</p>
 
             <p class="t-comment">
               {{ truncate(favorite.title, 20) }}
