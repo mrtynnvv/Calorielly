@@ -5,7 +5,7 @@
       <div class="section">
 
         <img src="@/assets/LeftBar/home.svg"></img>
-        <span>Главная</span>
+        <span class="t-main">Главная</span>
       </div>
     </RouterLink>
 
@@ -13,27 +13,27 @@
       <div class="section">
 
         <img src="@/assets/LeftBar/scales.svg"></img>
-        <span>Весы</span>
+        <span class="t-main">Весы</span>
       </div>
     </RouterLink>
     <RouterLink to="/history">
       <div class="section">
         <img src="@/assets/LeftBar/history.svg"></img>
 
-        <span>История</span>
+        <span class="t-main">История</span>
       </div>
     </RouterLink>
     <RouterLink to="/settings">
       <div class="section">
         <img src="@/assets/LeftBar/settings.svg"></img>
 
-        <span>Настройки</span>
+        <span class="t-main">Настройки</span>
       </div>
     </RouterLink>
     <RouterLink to="/profile">
       <div class="section">
         <img src="@/assets/LeftBar/auth.svg"></img>
-        <span>Аккаунт</span>
+        <span class="t-main">Аккаунт</span>
       </div>
     </RouterLink>
     <!-- </div> -->
@@ -86,7 +86,7 @@ const IS_DEMO = location.hostname.startsWith('demo.') || location.pathname.start
       cursor: pointer;
       transition: 0.3s;
     }
-    
+
   }
 
   .section {
@@ -100,24 +100,27 @@ const IS_DEMO = location.hostname.startsWith('demo.') || location.pathname.start
       cursor: pointer;
       transition: 0.3s;
     }
+
+    img {
+      float: left;
+      margin-right: 10px;
+      margin-top: -4px;
+      stroke: #2688EB;
+      width: 32px;
+
+    }
   }
 
-  img {
-    float: left;
-    margin-right: 10px;
-    margin-top: -5px;
-    stroke: #2688EB;
-    width: 32px;
-    
-  }
+
 
 
   & :deep(a) {
     color: black;
-    font-size: 15px;
-    font-weight: 500;
+
+    // font-size: 15px;
+    // font-weight: 500;
     text-decoration: none;
-    
+
   }
 }
 </style>

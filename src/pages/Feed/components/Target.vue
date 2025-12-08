@@ -131,14 +131,17 @@ async function getCcalToday() {
     })
     //выводит записи приемов пищи только за сегодня (границы дня по часовому поясу устройства)
     const start = new Date()
+
     start.setHours(0, 0, 0, 0)
+    console.log(start)
     const end = new Date()
     end.setHours(23, 59, 59, 999)
     const todayItems = data.filter((i: any) => {
       const d = new Date(i.eatenAt)
+      console.log(d)
       return d >= start && d <= end
     })
-    //выводит сумму калорий за сегодня (чп аналогично)
+    //выводит сумму калорий за сегодня (часовой пояс аналогично)
     ccalToday.value = todayItems.reduce(
       (s: any, i: any) => s + Number(i.calories),
       0,

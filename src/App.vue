@@ -27,7 +27,7 @@
 
 <script setup lang="ts">
 import Footer from '@/components/blocks/Footer.vue'
-import Header from '@/components/blocks/Header.vue'
+import Header from '@/components/blocks/Header/index.vue'
 import LeftBar from '@/components/blocks/LeftBar.vue'
 </script>
 
