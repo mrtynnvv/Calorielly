@@ -26,7 +26,7 @@
           <div class="card-value">{{ fmtHM(item.delayMs) }}</div>
           <div v-if="item.lateMs > 0" class="card-sub">
             Старт сейчас • поздно на {{ fmtHM(item.lateMs) }} (нужно было в
-            {{ fmtClock(item.startAt) }})
+            {{ fmtClock(item.idealStartAt) }})
           </div>
           <div v-else class="card-sub">
             Старт в {{ fmtClock(item.startAt) }}
@@ -91,6 +91,7 @@ const timeToFinishMs = computed<number>(
 )
 
 type RecipeView = Recipe & {
+  idealStartAt: Date
   startAt: Date
   delayMs: number
   lateMs: number
@@ -101,11 +102,13 @@ const items = computed<RecipeView[]>(() => {
   const nowMs = now.value.getTime()
   return recipes.map((recipe) => {
     const cookMs = recipe.minutes * 60_000
-    const startAt = new Date(finish - cookMs)
-    const delayRawMs = startAt.getTime() - nowMs
-    const delayMs = Math.max(0, delayRawMs)
+    const idealStartAt = new Date(finish - cookMs)
+    const delayRawMs = idealStartAt.getTime() - nowMs
+    const delayMs =
+      delayRawMs <= 0 ? 0 : Math.floor(delayRawMs / 600_000) * 600_000
+    const startAt = new Date(nowMs + delayMs)
     const lateMs = Math.max(0, -delayRawMs)
-    return { ...recipe, startAt, delayMs, lateMs }
+    return { ...recipe, idealStartAt, startAt, delayMs, lateMs }
   })
 })
 
@@ -233,4 +236,3 @@ onUnmounted(() => {
   line-height: 1.35;
 }
 </style>
-
