@@ -4,6 +4,7 @@ import Auth from '@/pages/Auth/index.vue'
 import Feed from '@/pages/Feed/index.vue'
 import History from '@/pages/History/index.vue'
 import budget from '@/pages/Other/budget.vue'
+import cook from '@/pages/Other/cook.vue'
 import fridayCalories from '@/pages/Other/fridayCalories.vue'
 import game from '@/pages/Other/game.vue'
 import mileage from '@/pages/Other/mileage.vue'
@@ -30,6 +31,7 @@ const routes = [
   }, //blank: true отрисовывает компонент без хедера, меню и тд
   // Other
   { path: '/budget', component: budget, meta: { blank: true } },
+  { path: '/cook', component: cook, meta: { blank: true } },
   { path: '/timer', component: timer, meta: { blank: true } },
   { path: '/game', component: game, meta: { blank: true } },
   { path: '/mileage', component: mileage, meta: { blank: true } },
