@@ -2,13 +2,8 @@
   <div class="main">
     <div class="panel">
       <div class="title-row">
-        <div>
-          <div class="title">Cook</div>
-          <div class="meta">
-            Сейчас: {{ fmtClock(now) }} • Финиш: {{ finishLabel }} • До финиша:
-            {{ fmtHMS(timeToFinishMs) }}
-          </div>
-        </div>
+        <div class="title">Cook</div>
+        <div class="subtitle">Готово к {{ finishTimeText }}</div>
       </div>
 
       <div class="grid">
@@ -16,21 +11,12 @@
           v-for="item in items"
           :key="item.key"
           class="card"
-          :class="{ late: item.lateMs > 0 }"
         >
           <div class="card-head">
             <div class="card-title">{{ item.name }}</div>
             <div class="card-meta">{{ item.minutes }} мин</div>
           </div>
-
           <div class="card-value">{{ fmtHM(item.delayMs) }}</div>
-          <div v-if="item.lateMs > 0" class="card-sub">
-            Старт сейчас • поздно на {{ fmtHM(item.lateMs) }} (нужно было в
-            {{ fmtClock(item.idealStartAt) }})
-          </div>
-          <div v-else class="card-sub">
-            Старт в {{ fmtClock(item.startAt) }}
-          </div>
         </div>
       </div>
     </div>
@@ -46,8 +32,8 @@ type Recipe = {
   minutes: number
 }
 
-const FINISH_HOUR = 8
-const FINISH_MINUTE = 0
+const FINISH_HOUR = 6
+const FINISH_MINUTE = 30
 
 const recipes: Recipe[] = [
   { key: 'oatmeal', name: 'Овсяная', minutes: 40 },
@@ -62,14 +48,6 @@ function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
 
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  )
-}
-
 function getNextFinishTime(d: Date): Date {
   const y = d.getFullYear()
   const m = d.getMonth()
@@ -80,21 +58,12 @@ function getNextFinishTime(d: Date): Date {
 }
 
 const finishAt = computed<Date>(() => getNextFinishTime(now.value))
-
-const finishLabel = computed<string>(() => {
-  const when = isSameDay(finishAt.value, now.value) ? 'сегодня' : 'завтра'
-  return `${when} ${fmtClock(finishAt.value)}`
-})
-
-const timeToFinishMs = computed<number>(
-  () => finishAt.value.getTime() - now.value.getTime(),
+const finishTimeText = computed<string>(
+  () => `${pad(FINISH_HOUR)}:${pad(FINISH_MINUTE)}`,
 )
 
 type RecipeView = Recipe & {
-  idealStartAt: Date
-  startAt: Date
   delayMs: number
-  lateMs: number
 }
 
 const items = computed<RecipeView[]>(() => {
@@ -102,36 +71,18 @@ const items = computed<RecipeView[]>(() => {
   const nowMs = now.value.getTime()
   return recipes.map((recipe) => {
     const cookMs = recipe.minutes * 60_000
-    const idealStartAt = new Date(finish - cookMs)
-    const delayRawMs = idealStartAt.getTime() - nowMs
+    const delayRawMs = finish - cookMs - nowMs
     const delayMs =
       delayRawMs <= 0 ? 0 : Math.floor(delayRawMs / 600_000) * 600_000
-    const startAt = new Date(nowMs + delayMs)
-    const lateMs = Math.max(0, -delayRawMs)
-    return { ...recipe, idealStartAt, startAt, delayMs, lateMs }
+    return { ...recipe, delayMs }
   })
 })
-
-function fmtHMS(ms: number): string {
-  const safe = Math.max(0, ms)
-  const h = Math.floor(safe / 3_600_000)
-  const m = Math.floor((safe % 3_600_000) / 60_000)
-  const s = Math.floor((safe % 60_000) / 1000)
-  return `${pad(h)}:${pad(m)}:${pad(s)}`
-}
 
 function fmtHM(ms: number): string {
   const safe = Math.max(0, ms)
   const h = Math.floor(safe / 3_600_000)
   const m = Math.floor((safe % 3_600_000) / 60_000)
   return `${pad(h)}:${pad(m)}`
-}
-
-function fmtClock(d: Date): string {
-  return new Intl.DateTimeFormat('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(d)
 }
 
 function tick(): void {
@@ -181,10 +132,10 @@ onUnmounted(() => {
   letter-spacing: -0.02em;
 }
 
-.meta {
+.subtitle {
   color: #667085;
   font-size: 13px;
-  margin-top: 4px;
+  font-weight: 700;
 }
 
 .grid {
@@ -199,11 +150,6 @@ onUnmounted(() => {
   display: grid;
   gap: 8px;
   padding: 14px 14px 12px;
-}
-
-.card.late {
-  border-color: #ffb1b1;
-  background: #fff6f6;
 }
 
 .card-head {
@@ -228,11 +174,5 @@ onUnmounted(() => {
   font-weight: 900;
   letter-spacing: -0.03em;
   line-height: 1;
-}
-
-.card-sub {
-  color: #475467;
-  font-size: 13px;
-  line-height: 1.35;
 }
 </style>
