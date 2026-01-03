@@ -16,7 +16,7 @@
       </label>
 
       <div class="meta">
-        <div>Точка отсчёта: 14 марта 2025 — {{ fmt(BASE_ODOM) }} км</div>
+        <div>Точка отсчёта: 29 декабря 2025 — {{ fmt(BASE_ODOM) }} км</div>
         <div>Прошло дней: {{ fmt1(elapsedDays) }}</div>
         <div v-if="deltaKm >= 0">Намотано: {{ fmt(deltaKm) }} км</div>
         <div v-else class="warn">Текущий пробег меньше точки отсчёта</div>
@@ -35,8 +35,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-const BASE_DATE = new Date(2025, 2, 14)
-const BASE_ODOM = 148_816
+const BASE_DATE = new Date(2025, 11, 29)
+const BASE_ODOM = 0
 
 const odometer = ref<number>(BASE_ODOM)
 const now = ref<Date>(new Date())
@@ -50,8 +50,12 @@ onUnmounted(() => {
   if (timerId != null) clearInterval(timerId)
 })
 
+function startOfDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+}
+
 const elapsedDays = computed<number>(() => {
-  const diff = now.value.getTime() - BASE_DATE.getTime()
+  const diff = startOfDay(now.value) - startOfDay(BASE_DATE)
   return diff > 0 ? diff / 86_400_000 : 0
 })
 
