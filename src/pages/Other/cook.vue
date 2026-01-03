@@ -7,11 +7,7 @@
       </div>
 
       <div class="grid">
-        <div
-          v-for="item in items"
-          :key="item.key"
-          class="card"
-        >
+        <div v-for="item in items" :key="item.key" class="card">
           <div class="card-head">
             <div class="card-title">{{ item.name }}</div>
             <div class="card-meta">{{ item.minutes }} мин</div>
@@ -30,15 +26,16 @@ type Recipe = {
   key: string
   name: string
   minutes: number
+  calibrationMinutes: number
 }
 
 const FINISH_HOUR = 6
-const FINISH_MINUTE = 30
+const FINISH_MINUTE = 0
 
 const recipes: Recipe[] = [
-  { key: 'oatmeal', name: 'Овсяная', minutes: 40 },
-  { key: 'semolina', name: 'Манная', minutes: 15 },
-  { key: 'milk', name: 'Кукурузная', minutes: 60 },
+  { key: 'oatmeal', name: 'Овсяная', minutes: 40, calibrationMinutes: 30 },
+  { key: 'semolina', name: 'Манная', minutes: 15, calibrationMinutes: 20 },
+  { key: 'milk', name: 'Кукурузная', minutes: 60, calibrationMinutes: 40 },
 ]
 
 const now = ref<Date>(new Date())
@@ -58,22 +55,22 @@ function getNextFinishTime(d: Date): Date {
 }
 
 const finishAt = computed<Date>(() => getNextFinishTime(now.value))
-const finishTimeText = computed<string>(
-  () => `${pad(FINISH_HOUR)}:${pad(FINISH_MINUTE)}`,
-)
+const finishTimeText = computed<string>(() => `${pad(FINISH_HOUR)}:${pad(FINISH_MINUTE)}`)
 
 type RecipeView = Recipe & {
   delayMs: number
 }
+const STEP_MS = 600_000
 
 const items = computed<RecipeView[]>(() => {
-  const finish = finishAt.value.getTime()
+  const finishMs = finishAt.value.getTime()
   const nowMs = now.value.getTime()
   return recipes.map((recipe) => {
-    const cookMs = recipe.minutes * 60_000
-    const delayRawMs = finish - cookMs - nowMs
-    const delayMs =
-      delayRawMs <= 0 ? 0 : Math.floor(delayRawMs / 600_000) * 600_000
+    const leftToFinishMs = finishMs - nowMs 
+    const cookNominalMs = recipe.minutes * 60_000
+    const calibrationMs = recipe.calibrationMinutes * 60_000
+    const delayRawMs = leftToFinishMs - cookNominalMs + calibrationMs
+    const delayMs = delayRawMs <= 0 ? 0 : Math.floor(delayRawMs / STEP_MS) * STEP_MS
     return { ...recipe, delayMs }
   })
 })
