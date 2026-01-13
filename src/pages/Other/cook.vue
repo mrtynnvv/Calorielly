@@ -30,7 +30,7 @@ type Recipe = {
 }
 
 const FINISH_HOUR = 6
-const FINISH_MINUTE = 0
+const FINISH_MINUTE = 30
 
 const recipes: Recipe[] = [
   { key: 'oatmeal', name: 'Овсяная', minutes: 40, calibrationMinutes: 30 },
