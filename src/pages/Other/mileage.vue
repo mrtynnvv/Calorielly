@@ -1,42 +1,14 @@
-<template>
-  <div class="main">
-    <div class="panel">
-      <div class="title">Годовой пробег</div>
-
-      <label class="field">
-        <span class="label">Текущий пробег, км</span>
-        <input
-          class="input"
-          type="number"
-          inputmode="numeric"
-          min="0"
-          v-model.number="odometer"
-          placeholder="Введите текущий пробег"
-        />
-      </label>
-
-      <div class="meta">
-        <div>Точка отсчёта: 29 декабря 2025 — {{ fmt(BASE_ODOM) }} км</div>
-        <div>Прошло дней: {{ fmt1(elapsedDays) }}</div>
-        <div v-if="deltaKm >= 0">Намотано: {{ fmt(deltaKm) }} км</div>
-        <div v-else class="warn">Текущий пробег меньше точки отсчёта</div>
-      </div>
-
-      <div class="result">
-        <div class="value">{{ fmt(annualized) }}</div>
-        <div class="suffix">км/год</div>
-      </div>
-
-      <div class="sub">Среднесуточный: {{ fmt1(avgPerDay) }} км/день</div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
+// ОЧЕРЕДНОЕ ТЕХНИЧЕСКОЕ ОБСЛУЖИВАНИЕ:
+const NEXT_SERVICE_ODOM = 19302
+
+const SERVICE_APPOINTMENT_LEAD_KM = 500
+
 const BASE_DATE = new Date(2025, 11, 29)
 const BASE_ODOM = 0
+const SERVICE_APPOINTMENT_ODOM = NEXT_SERVICE_ODOM - SERVICE_APPOINTMENT_LEAD_KM
 
 const odometer = ref<number>(BASE_ODOM)
 const now = ref<Date>(new Date())
@@ -74,6 +46,29 @@ const annualized = computed<number>(() => {
   return daily * 365
 })
 
+const plannedVisitDate = computed<string>(() => forecastDateText(SERVICE_APPOINTMENT_ODOM))
+
+const latestVisitDate = computed<string>(() => forecastDateText(NEXT_SERVICE_ODOM))
+
+function forecastDateByKmLeft(kmLeft: number): Date | null {
+  const daily = avgPerDay.value
+  if (daily <= 0 || kmLeft <= 0) return null
+
+  const daysLeft = kmLeft / daily
+  const date = new Date(now.value)
+  date.setDate(date.getDate() + Math.ceil(daysLeft))
+  return date
+}
+
+function forecastDateText(targetOdom: number): string {
+  const kmLeft = targetOdom - odometer.value
+  if (kmLeft < 0) return 'уже пройдено'
+  if (kmLeft === 0) return 'сегодня'
+
+  const date = forecastDateByKmLeft(kmLeft)
+  return date ? fmtDate(date) : 'недостаточно данных'
+}
+
 function fmt(n: number): string {
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(n)
 }
@@ -81,7 +76,69 @@ function fmt(n: number): string {
 function fmt1(n: number): string {
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(n)
 }
+
+function fmtDate(d: Date): string {
+  const parts = new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).formatToParts(d)
+
+  const day = parts.find((part) => part.type === 'day')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const year = parts.find((part) => part.type === 'year')?.value
+
+  return [day, month, year].filter(Boolean).join(' ')
+}
 </script>
+
+<template>
+  <div class="main">
+    <div class="panel">
+      <div class="title">Годовой пробег</div>
+
+      <label class="field">
+        <span class="label">Текущий пробег, км</span>
+        <input
+          class="input"
+          type="number"
+          inputmode="numeric"
+          min="0"
+          v-model.number="odometer"
+          placeholder="Введите текущий пробег"
+        />
+      </label>
+
+      <div class="meta">
+        <div>Точка отсчёта: 29 декабря 2025 — {{ fmt(BASE_ODOM) }} км</div>
+        <div>Прошло дней: {{ fmt1(elapsedDays) }}</div>
+        <div v-if="deltaKm >= 0">Намотано: {{ fmt(deltaKm) }} км</div>
+        <div v-else class="warn">Текущий пробег меньше точки отсчёта</div>
+      </div>
+
+      <div class="result">
+        <div class="value">{{ fmt(annualized) }}</div>
+        <div class="suffix">км/год</div>
+      </div>
+
+      <div class="sub">Среднесуточный: {{ fmt1(avgPerDay) }} км/день</div>
+
+      <div class="dates">
+        <div class="date-row">
+          <div class="date-label">Планируемая дата посещения ДЦ</div>
+          <div class="date-value">{{ plannedVisitDate }}</div>
+          <div class="date-note">на пробеге {{ fmt(SERVICE_APPOINTMENT_ODOM) }} км</div>
+        </div>
+
+        <div class="date-row date-row_danger">
+          <div class="date-label">Крайняя планируемая дата</div>
+          <div class="date-value">{{ latestVisitDate }}</div>
+          <div class="date-note">красная зона {{ fmt(NEXT_SERVICE_ODOM) }} км</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
 
 <style scoped>
 .main {
@@ -167,5 +224,44 @@ function fmt1(n: number): string {
   color: #666;
   font-size: 14px;
   text-align: center;
+}
+
+.dates {
+  display: grid;
+  gap: 12px;
+}
+
+.date-row {
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+}
+
+.date-row_danger {
+  border-color: #f0c8c8;
+}
+
+.date-row_danger .date-value {
+  color: #b30000;
+}
+
+.date-label {
+  color: #666;
+  font-size: 13px;
+}
+
+.date-value {
+  color: #111;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.date-note {
+  color: #666;
+  font-size: 13px;
 }
 </style>
