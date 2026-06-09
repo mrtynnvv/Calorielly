@@ -5,6 +5,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 const NEXT_SERVICE_ODOM = 19302
 
 const SERVICE_APPOINTMENT_LEAD_KM = 500
+const IDEAL_ANNUAL_KM = 33333
 
 const BASE_DATE = new Date(2025, 11, 29)
 const BASE_ODOM = 0
@@ -44,6 +45,29 @@ const annualized = computed<number>(() => {
   const daily = avgPerDay.value
   if (daily <= 0) return 0
   return daily * 365
+})
+
+const idealPerDay = computed<number>(() => IDEAL_ANNUAL_KM / 365)
+
+const idealPerMonth = computed<number>(() => IDEAL_ANNUAL_KM / 12)
+
+const idealOdomToday = computed<number>(() => {
+  return BASE_ODOM + idealPerDay.value * elapsedDays.value
+})
+
+const idealDiffKm = computed<number>(() => odometer.value - idealOdomToday.value)
+
+const idealDiffAbsKm = computed<number>(() => Math.abs(idealDiffKm.value))
+
+const idealRestDays = computed<number>(() => {
+  if (idealDiffKm.value <= 0) return 0
+  return Math.ceil(idealDiffKm.value / idealPerDay.value)
+})
+
+const idealDiffLabel = computed<string>(() => {
+  if (idealDiffKm.value > 0) return 'Перепробег'
+  if (idealDiffKm.value < 0) return 'Недопробег'
+  return 'Идёшь ровно по плану'
 })
 
 const plannedVisitDate = computed<string>(() => forecastDateText(SERVICE_APPOINTMENT_ODOM))
@@ -112,8 +136,16 @@ function fmtDate(d: Date): string {
       <div class="meta">
         <div>Точка отсчёта: 29 декабря 2025 — {{ fmt(BASE_ODOM) }} км</div>
         <div>Прошло дней: {{ fmt1(elapsedDays) }}</div>
-        <div v-if="deltaKm >= 0">Намотано: {{ fmt(deltaKm) }} км</div>
-        <div v-else class="warn">Текущий пробег меньше точки отсчёта</div>
+        <div>
+          Идеал: {{ fmt(IDEAL_ANNUAL_KM) }} км/год ({{ fmt(idealPerMonth) }} км/мес,
+          {{ fmt1(idealPerDay) }} км/день)
+        </div>
+        <div>По плану на сегодня: {{ fmt(idealOdomToday) }} км</div>
+        <div :class="{ warn: idealDiffKm > 0 }">
+          {{ idealDiffLabel }}<template v-if="idealDiffKm !== 0">: {{ fmt(idealDiffAbsKm) }} км</template>
+          <template v-if="idealRestDays > 0"> (не ездить {{ idealRestDays }} дней)</template>
+        </div>
+        <div v-if="deltaKm < 0" class="warn">Текущий пробег меньше точки отсчёта</div>
       </div>
 
       <div class="result">
