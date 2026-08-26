@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <i>Веб-приложение <a href="https://calorielly.tech">calorielly.tech</a> </i>
+  <i>Веб-приложение <a href="https://calorielly.ru">calorielly.ru</a> </i>
 </p>
 <h1 align="center">Calorielly</h1>
 <!-- <p align="center">Счетчик калорий, дневник питания.</p> -->
