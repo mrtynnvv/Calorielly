@@ -6,8 +6,8 @@
           <img src="@/assets/default_avatar.png" />
         </div>
         <div class="text">
-          <p class="t-title">Guest</p>
-          <p class="t-comment">ID: 0</p>
+          <p class="t-title">Мой профиль</p>
+          <p class="t-comment">{{ phone }}</p>
         </div>
       </div>
       <div class="rightBlock">
@@ -18,11 +18,27 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
+import { useUser } from '@/store/User'
 
 const router = useRouter()
+const userStore = useUser()
+const phone = computed(() => {
+  if (userStore.token === 'demo') return 'Демонстрационный аккаунт'
+
+  try {
+    const payload = userStore.token.split('.')[1]!
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')
+    const { phone } = JSON.parse(atob(padded)) as { phone?: unknown }
+    return typeof phone === 'string' ? phone : 'Телефон недоступен'
+  } catch {
+    return 'Телефон недоступен'
+  }
+})
 </script>
 
 <style scoped lang="scss">
