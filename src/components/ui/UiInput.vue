@@ -57,5 +57,11 @@ function onInput(e: Event) {
     border: 1px solid #2688eb;
     outline: none;
   }
+
+  &:disabled {
+    color: $color-comment;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
 }
 </style>

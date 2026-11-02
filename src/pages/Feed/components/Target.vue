@@ -19,27 +19,43 @@
           </div>
           <div class="description">
             <a class="t-title">Калории</a>
-            <a class="t-comment" v-if="ccalLimit - ccalToday < 0"
-              >переедено
+            <p v-if="scheduleStatus" class="t-comment">{{ scheduleStatus }}</p>
+            <template v-else>
+              <a class="t-comment" v-if="ccalLimit - ccalEaten < 0"
+                >переедено
 
-              {{ Math.abs(ccalLimit - ccalToday).toFixed(0) }}
-              ккал</a
-            >
-            <a v-else class="t-comment"
-              >осталось
+                {{ Math.abs(ccalLimit - ccalEaten).toFixed(0) }}
+                ккал</a
+              >
+              <a v-else class="t-comment"
+                >осталось
 
-              {{ (ccalLimit - ccalToday).toFixed(0) }}
-              ккал</a
-            >
+                {{ (ccalLimit - ccalEaten).toFixed(0) }}
+                ккал</a
+              >
+              <p v-if="period.mealIndex !== null" class="t-comment">
+                Приём {{ period.mealIndex + 1 }} · до
+                {{
+                  period.end.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  })
+                }}
+              </p>
 
-            <div class="line">
-              <div
-                class="lineBlue"
-                :style="{
-                  width: Math.min((ccalToday / ccalLimit) * 100, 100) + '%',
-                }"
-              ></div>
-            </div>
+              <div class="line">
+                <div
+                  class="lineBlue"
+                  :style="{
+                    width:
+                      (ccalLimit > 0
+                        ? Math.min((ccalEaten / ccalLimit) * 100, 100)
+                        : 0) + '%',
+                  }"
+                ></div>
+              </div>
+            </template>
           </div>
         </UiBlock>
 
@@ -75,21 +91,53 @@
 
 <script setup lang="ts">
 import axios from 'axios'
-import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
 import { useUser } from '@/store/User'
+import { getCaloriePeriod, type MealSchedule } from '@/utils/mealSchedule'
 
 const API_BASE = import.meta.env.VITE_API_BASE
 const userStore = useUser()
 
-const ccalToday = ref(0)
-const ccalLimit = ref(0)
+const foods = ref<{ eatenAt: string; calories: number }[]>([])
+const dailyLimit = ref(0)
+const schedule = ref<MealSchedule>({ enabled: false, meals: [] })
+const scheduleStatus = ref('Загрузка...')
+const now = ref(new Date())
+const period = computed(() =>
+  getCaloriePeriod(now.value, dailyLimit.value, schedule.value),
+)
+const ccalLimit = computed(() => period.value.limit)
+const ccalEaten = computed(() =>
+  foods.value
+    .filter((food) => {
+      const eatenAt = new Date(food.eatenAt)
+      return eatenAt >= period.value.start && eatenAt < period.value.end
+    })
+    .reduce((sum, food) => sum + Number(food.calories), 0),
+)
 const desiredWeight = ref(0)
 const lastWeight = ref(0)
 const contentRef = ref<HTMLDivElement | null>(null)
 const atStart = ref(true)
 const atEnd = ref(false)
+let clockTimer: ReturnType<typeof setTimeout>
+let resizeObserver: ResizeObserver
+
+function updateClock() {
+  now.value = new Date()
+  clearTimeout(clockTimer)
+  clockTimer = setTimeout(updateClock, 60000 - (Date.now() % 60000))
+}
+
+function refreshOnVisible() {
+  if (document.hidden) return
+  updateClock()
+  getFoods()
+  getMealSchedule()
+  getCcalLimit()
+}
 
 const updateArrows = () => {
   const el = contentRef.value
@@ -122,35 +170,34 @@ const scrollToEnd = () => {
   el.scrollTo({ left: max, behavior: 'smooth' })
 }
 
-async function getCcalToday() {
+async function getFoods() {
   try {
     const { data } = await axios.get(`${API_BASE}/users/me/foods`, {
       headers: {
         Authorization: `Bearer ${userStore.token}`,
       },
     })
-    //выводит записи приемов пищи только за сегодня (границы дня по часовому поясу устройства)
-    const start = new Date()
-
-    start.setHours(0, 0, 0, 0)
-    console.log(start)
-    const end = new Date()
-    end.setHours(23, 59, 59, 999)
-    const todayItems = data.filter((i: any) => {
-      const d = new Date(i.eatenAt)
-      console.log(d)
-      return d >= start && d <= end
-    })
-    //выводит сумму калорий за сегодня (часовой пояс аналогично)
-    ccalToday.value = todayItems.reduce(
-      (s: any, i: any) => s + Number(i.calories),
-      0,
-    )
+    foods.value = data
   } catch (e) {
     console.log(e)
   }
 }
-getCcalToday()
+getFoods()
+
+async function getMealSchedule() {
+  try {
+    const { data } = await axios.get<MealSchedule>(
+      `${API_BASE}/users/me/meal-schedule`,
+      { headers: { Authorization: `Bearer ${userStore.token}` } },
+    )
+    schedule.value = data
+    scheduleStatus.value = ''
+  } catch (e) {
+    console.log(e)
+    scheduleStatus.value = 'Не удалось загрузить режим питания.'
+  }
+}
+getMealSchedule()
 
 async function getCcalLimit() {
   try {
@@ -159,7 +206,7 @@ async function getCcalLimit() {
         Authorization: `Bearer ${userStore.token}`,
       },
     })
-    ccalLimit.value = data.dailyCalorieLimit
+    dailyLimit.value = data.dailyCalorieLimit ?? 0
   } catch (e) {
     console.log(e)
   }
@@ -197,17 +244,29 @@ getLastWeight()
 watch(
   () => userStore.feedRevision,
   () => {
-    getCcalToday(), getLastWeight()
+    getFoods()
+    getLastWeight()
+    getCcalLimit()
+    getMealSchedule()
   },
 )
 
 onMounted(async () => {
+  updateClock()
+  document.addEventListener('visibilitychange', refreshOnVisible)
+  window.addEventListener('focus', updateClock)
   await nextTick()
   requestAnimationFrame(updateArrows)
   setTimeout(updateArrows, 100)
-  const ro = new ResizeObserver(updateArrows)
-  if (contentRef.value) ro.observe(contentRef.value)
-  onBeforeUnmount(() => ro.disconnect())
+  resizeObserver = new ResizeObserver(updateArrows)
+  if (contentRef.value) resizeObserver.observe(contentRef.value)
+})
+
+onBeforeUnmount(() => {
+  clearTimeout(clockTimer)
+  resizeObserver?.disconnect()
+  document.removeEventListener('visibilitychange', refreshOnVisible)
+  window.removeEventListener('focus', updateClock)
 })
 </script>
 
