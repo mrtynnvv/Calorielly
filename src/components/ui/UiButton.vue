@@ -21,10 +21,15 @@ defineProps({ text: { type: String } })
   transition: 0.3s;
   width: 100%;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: #439eff;
     cursor: pointer;
     transition: 0.3s;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
 }
 </style>

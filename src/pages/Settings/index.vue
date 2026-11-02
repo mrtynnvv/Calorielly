@@ -1,93 +1,420 @@
 <template>
-  <div class="mainBlockSettings">
-    <div class="title">Настройки целей</div>
+  <UiBlock class="settings">
+    <p class="t-title">Настройки целей</p>
 
-    <div class="nameInput">Желаемый вес</div>
-    <div>
-      <UiInput placeholder="Вес кг" v-model.number="weight" type="number" />
-    </div>
-    <div>
-      <UiButton @click="editDesiredWeight()" text="Изменить" />
+    <div class="fields">
+      <div class="field">
+        <label class="t-main" for="desired-weight">Желаемый вес</label>
+        <UiInput
+          id="desired-weight"
+          v-model.number="weight"
+          placeholder="Вес, кг"
+          type="number"
+          min="10"
+          max="300"
+          step="1"
+          :disabled="!loaded || saving || userStore.token === 'demo'"
+        />
+      </div>
+      <div class="field">
+        <label class="t-main" for="daily-calories"
+          >Суточный лимит калорий</label
+        >
+        <UiInput
+          id="daily-calories"
+          v-model.number="ccal"
+          placeholder="Ккал"
+          type="number"
+          min="800"
+          max="7000"
+          step="1"
+          :disabled="
+            !loaded || scheduleEnabled || saving || userStore.token === 'demo'
+          "
+        />
+      </div>
     </div>
 
-    <div class="nameInput">Лимит калорий</div>
-    <div>
-      <UiInput placeholder="Ккал" v-model.number="ccal" type="number" />
-    </div>
+    <div class="schedule">
+      <div class="header">
+        <label class="t-main" for="meal-schedule-enabled">
+          Расширенная модель приёмов пищи
+        </label>
+        <UiSwitch
+          id="meal-schedule-enabled"
+          v-model="scheduleEnabled"
+          :disabled="!loaded || saving"
+        />
+      </div>
 
-    <UiButton @click="editLimitCcal()" text="Изменить" />
-  </div>
+      <template v-if="scheduleEnabled">
+        <div class="field">
+          <label class="t-main" for="meal-count">Количество приёмов</label>
+          <UiSelect
+            id="meal-count"
+            v-model="mealCount"
+            :options="mealCounts"
+            :disabled="saving"
+          />
+        </div>
+
+        <div v-for="(meal, index) in meals" :key="index" class="meal">
+          <p class="t-main">Приём пищи {{ index + 1 }}</p>
+          <div class="fields">
+            <div class="field">
+              <label class="t-main" :for="`meal-hours-${index}`">Время</label>
+              <div class="time">
+                <UiSelect
+                  :id="`meal-hours-${index}`"
+                  :model-value="
+                    meal.time ? Number(meal.time.slice(0, 2)) : null
+                  "
+                  :options="mealHours"
+                  :aria-label="`Часы приёма ${index + 1}`"
+                  :disabled="saving"
+                  leading-zero
+                  @update:model-value="setMealTime(meal, 'hours', $event)"
+                />
+                <span class="t-main" aria-hidden="true">:</span>
+                <UiSelect
+                  :model-value="meal.time ? Number(meal.time.slice(3)) : null"
+                  :options="meal.time.startsWith('23:') ? [0] : mealMinutes"
+                  :aria-label="`Минуты приёма ${index + 1}`"
+                  :disabled="saving || !meal.time"
+                  leading-zero
+                  @update:model-value="setMealTime(meal, 'minutes', $event)"
+                />
+              </div>
+            </div>
+            <div class="field">
+              <label class="t-main" :for="`meal-calories-${index}`"
+                >Лимит калорий</label
+              >
+              <UiInput
+                :id="`meal-calories-${index}`"
+                v-model.number="meal.calories"
+                type="number"
+                placeholder="Лимит калорий"
+                min="1"
+                max="2147483647"
+                step="1"
+                :disabled="saving"
+              />
+            </div>
+            <div class="field favorites">
+              <label class="t-main" :for="`meal-favorites-${index}`"
+                >Избранные блюда</label
+              >
+              <UiSelect
+                :id="`meal-favorites-${index}`"
+                :model-value="meal.favoriteIds"
+                :options="favoriteOptions"
+                :placeholder="
+                  favoriteOptions.length
+                    ? 'Выберите блюда'
+                    : 'Нет избранных блюд'
+                "
+                :disabled="saving || !favoriteOptions.length"
+                multiple
+                @update:model-value="meal.favoriteIds = $event"
+              />
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+    <UiButton
+      :disabled="!canSave"
+      :text="saving ? 'Сохранение...' : 'Сохранить'"
+      @click="saveSettings()"
+    />
+    <p v-if="message" class="message t-comment" role="status">
+      {{ message }}
+    </p>
+  </UiBlock>
 </template>
 
 <script setup lang="ts">
 import axios from 'axios'
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
+import UiBlock from '@/components/ui/UiBlock.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiInput from '@/components/ui/UiInput.vue'
+import UiSelect from '@/components/ui/UiSelect.vue'
+import UiSwitch from '@/components/ui/UiSwitch.vue'
 import { useUser } from '@/store/User'
+import {
+  getMealScheduleError,
+  type Meal,
+  type MealSchedule,
+} from '@/utils/mealSchedule'
+
 const userStore = useUser()
 const API_BASE = import.meta.env.VITE_API_BASE
-
+type Favorite = { id: string; title: string; calories: number }
+const loaded = ref(false)
+const saving = ref(false)
+const message = ref('')
 const weight = ref<number | null>(null)
+const savedWeight = ref<number | null>(null)
 const ccal = ref<number | null>(null)
-
-async function editDesiredWeight() {
-  try {
-    await axios.patch(
-      `${API_BASE}/users/me/desired-weight`,
-      {
-        value: weight.value,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${userStore.token}`,
-        },
-      },
+const savedCcal = ref<number | null>(null)
+const scheduleEnabled = ref(false)
+const savedScheduleEnabled = ref(false)
+const meals = ref<Meal[]>([])
+const savedMeals = ref<Meal[]>([])
+const favorites = ref<Favorite[]>([])
+const favoriteOptions = computed(() =>
+  favorites.value.map((favorite) => ({
+    value: favorite.id,
+    label: `${favorite.title} · ${favorite.calories} ккал`,
+  })),
+)
+const mealCounts = Array.from({ length: 7 }, (_, index) => index + 2)
+const mealHours = Array.from({ length: 23 }, (_, index) => index + 1)
+const mealMinutes = Array.from({ length: 60 }, (_, index) => index)
+const weightChanged = computed(() => weight.value !== savedWeight.value)
+const ccalChanged = computed(() => ccal.value !== savedCcal.value)
+const scheduleChanged = computed(() => {
+  if (scheduleEnabled.value !== savedScheduleEnabled.value) return true
+  if (!scheduleEnabled.value && getMealScheduleError(meals.value)) return false
+  return (
+    meals.value.length !== savedMeals.value.length ||
+    meals.value.some((meal, index) => {
+      const savedMeal = savedMeals.value[index]!
+      return (
+        meal.time !== savedMeal.time ||
+        meal.calories !== savedMeal.calories ||
+        meal.favoriteIds.length !== savedMeal.favoriteIds.length ||
+        meal.favoriteIds.some((id) => !savedMeal.favoriteIds.includes(id))
+      )
+    })
+  )
+})
+const canSave = computed(
+  () =>
+    loaded.value &&
+    !saving.value &&
+    userStore.token !== 'demo' &&
+    (weightChanged.value || ccalChanged.value || scheduleChanged.value),
+)
+const mealCount = computed({
+  get: () => meals.value.length || 2,
+  set: (count: number) => {
+    meals.value = Array.from(
+      { length: count },
+      (_, index) =>
+        meals.value[index] ?? { time: '', calories: null, favoriteIds: [] },
     )
-    weight.value = null
-  } catch (e) {
-    console.log(e)
-  }
+  },
+})
+
+function setMealTime(meal: Meal, part: 'hours' | 'minutes', value: number) {
+  const time = meal.time ? meal.time.split(':') : ['01', '00']
+  time[part === 'hours' ? 0 : 1] = String(value).padStart(2, '0')
+  if (time[0] === '23') time[1] = '00'
+  meal.time = time.join(':')
 }
 
-async function editLimitCcal() {
+watch(scheduleEnabled, (enabled) => {
+  if (enabled && meals.value.length === 0) mealCount.value = 2
+  message.value = ''
+})
+
+async function getSettings() {
   try {
-    await axios.patch(
-      `${API_BASE}/users/me/calorie-limit`,
-      {
-        value: ccal.value,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${userStore.token}`,
-        },
-      },
-    )
-    ccal.value = null
+    const config = { headers: { Authorization: `Bearer ${userStore.token}` } }
+    const [weightResponse, ccalResponse, scheduleResponse, favoritesResponse] =
+      await Promise.all([
+        axios.get<{ desiredWeight: number | null }>(
+          `${API_BASE}/users/me/desired-weight`,
+          config,
+        ),
+        axios.get<{ dailyCalorieLimit: number | null }>(
+          `${API_BASE}/users/me/calorie-limit`,
+          config,
+        ),
+        axios.get<MealSchedule>(`${API_BASE}/users/me/meal-schedule`, config),
+        axios.get<Favorite[]>(`${API_BASE}/users/me/favorites`, config),
+      ])
+    weight.value = weightResponse.data.desiredWeight
+    savedWeight.value = weightResponse.data.desiredWeight
+    ccal.value = ccalResponse.data.dailyCalorieLimit
+    savedCcal.value = ccalResponse.data.dailyCalorieLimit
+    meals.value = scheduleResponse.data.meals
+    savedMeals.value = meals.value.map((meal) => ({
+      ...meal,
+      favoriteIds: [...meal.favoriteIds],
+    }))
+    favorites.value = favoritesResponse.data
+    scheduleEnabled.value = scheduleResponse.data.enabled
+    savedScheduleEnabled.value = scheduleResponse.data.enabled
+    loaded.value = true
   } catch (e) {
     console.log(e)
+    message.value = 'Не удалось загрузить настройки. Обновите страницу.'
+  }
+}
+getSettings()
+
+async function saveSettings() {
+  if (!canSave.value) return
+  if (
+    weightChanged.value &&
+    (weight.value === null ||
+      !Number.isInteger(weight.value) ||
+      weight.value < 10 ||
+      weight.value > 300)
+  ) {
+    message.value = 'Укажите желаемый вес целым числом от 10 до 300 кг.'
+    return
+  }
+  if (
+    ccalChanged.value &&
+    (ccal.value === null ||
+      !Number.isInteger(ccal.value) ||
+      ccal.value < 800 ||
+      ccal.value > 7000)
+  ) {
+    message.value = 'Укажите суточный лимит целым числом от 800 до 7000 ккал.'
+    return
+  }
+  const scheduleError = getMealScheduleError(meals.value)
+  if (scheduleChanged.value && scheduleEnabled.value && scheduleError) {
+    message.value = scheduleError
+    return
+  }
+
+  saving.value = true
+  message.value = ''
+  let completed = false
+  try {
+    const config = { headers: { Authorization: `Bearer ${userStore.token}` } }
+    if (weightChanged.value) {
+      const { data } = await axios.patch<{ desiredWeight: number }>(
+        `${API_BASE}/users/me/desired-weight`,
+        { value: weight.value },
+        config,
+      )
+      weight.value = data.desiredWeight
+      savedWeight.value = data.desiredWeight
+      completed = true
+    }
+    if (ccalChanged.value) {
+      const { data } = await axios.patch<{ dailyCalorieLimit: number }>(
+        `${API_BASE}/users/me/calorie-limit`,
+        { value: ccal.value },
+        config,
+      )
+      ccal.value = data.dailyCalorieLimit
+      savedCcal.value = data.dailyCalorieLimit
+      completed = true
+    }
+    if (scheduleChanged.value) {
+      const { data } = await axios.patch<MealSchedule>(
+        `${API_BASE}/users/me/meal-schedule`,
+        {
+          enabled: scheduleEnabled.value,
+          meals: scheduleError ? savedMeals.value : meals.value,
+        },
+        config,
+      )
+      meals.value = data.meals
+      savedMeals.value = meals.value.map((meal) => ({
+        ...meal,
+        favoriteIds: [...meal.favoriteIds],
+      }))
+      scheduleEnabled.value = data.enabled
+      savedScheduleEnabled.value = data.enabled
+      completed = true
+    }
+  } catch (e) {
+    console.log(e)
+    message.value = completed
+      ? 'Часть настроек сохранена. Повторите сохранение оставшихся изменений.'
+      : 'Не удалось сохранить настройки. Попробуйте ещё раз.'
+  } finally {
+    if (completed) userStore.feedRevision++
+    saving.value = false
   }
 }
 </script>
 
 <style scoped lang="scss">
-.mainBlockSettings {
-  background-color: #fff;
-  border: 0.5px solid #d9d9d9;
-  border-radius: 16px;
-  padding: 20px 22px;
+.settings {
+  padding: 24px;
 
-  .title {
-    font-size: 17px;
-    font-weight: 600;
+  @media (width <=600px) {
+    padding: 16px;
   }
 
-  .nameInput {
-    color: rgb(88 99 111);
-    font-size: 15px;
-    font-weight: 500;
-    margin-top: 18px;
+  .fields {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    margin-top: 20px;
+
+    @media (width <=600px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .field label {
+    color: $color-comment;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .message {
+    margin-top: 12px;
+  }
+
+  .ui-select {
+    width: 80px;
+  }
+
+  .ui-button {
+    margin-top: 24px;
+    padding: 0 18px;
+    width: auto;
+  }
+
+  .schedule {
+    margin-top: 32px;
+
+    > .field {
+      margin-top: 20px;
+    }
+
+    .header {
+      align-items: center;
+      display: flex;
+      gap: 16px;
+      justify-content: space-between;
+    }
+
+    .meal {
+      margin-top: 24px;
+
+      .fields {
+        margin-top: 10px;
+      }
+
+      .favorites {
+        grid-column: 1 / -1;
+
+        .ui-select {
+          width: 100%;
+        }
+      }
+    }
+
+    .time {
+      align-items: center;
+      display: flex;
+      gap: 8px;
+    }
   }
 }
 </style>

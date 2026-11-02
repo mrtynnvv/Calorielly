@@ -4,6 +4,7 @@
   </UiModal>
   <UiModal :open="isOpenFavorite" @close="backToAdd">
     <FavoriteDetailModal
+      v-if="isOpenFavorite"
       :item="favPayload"
       @close="backToAdd"
       @close-all="closeAll"

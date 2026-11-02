@@ -47,6 +47,16 @@ function onInput(e: Event) {
   padding-left: 7px;
   width: 100%;
 
+  &[type='number'] {
+    appearance: textfield;
+
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+      appearance: none;
+      margin: 0;
+    }
+  }
+
   &::placeholder {
     color: #7e7e7e;
     font-size: 15px;
@@ -56,6 +66,12 @@ function onInput(e: Event) {
   &:focus {
     border: 1px solid #2688eb;
     outline: none;
+  }
+
+  &:disabled {
+    color: $color-comment;
+    cursor: not-allowed;
+    opacity: 0.6;
   }
 }
 </style>

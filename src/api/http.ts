@@ -155,6 +155,10 @@ function demoAdapter(original: any) {
         return ok(config, db['GET /users/me/calorie-limit'])
       }
 
+      if (path.endsWith('/users/me/meal-schedule')) {
+        return ok(config, { enabled: false, meals: [] })
+      }
+
       if (path.endsWith('/users/me/desired-weight')) {
         return ok(config, db['GET /users/me/desired-weight'])
       }
