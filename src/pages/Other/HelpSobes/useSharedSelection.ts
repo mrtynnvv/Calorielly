@@ -1,9 +1,15 @@
 import { onMounted, onUnmounted, watch, type Ref } from 'vue'
 
-import type { RoomSelection, SelectionPoint } from './useRoom'
+import {
+  sameSelection,
+  type RoomMessage,
+  type RoomSelection,
+  type SelectionPoint,
+} from './useRoom'
 
 const messageSelector = '[data-selection-message]'
 const highlightName = 'sobes-peer-selection'
+const savedHighlightName = 'sobes-saved-marks'
 
 function messageBodies(log: HTMLElement) {
   return log.querySelectorAll<HTMLElement>(messageSelector)
@@ -70,17 +76,14 @@ function textPoint(body: HTMLElement, offset: number): [Node, number] {
   return [body, body.childNodes.length]
 }
 
-function paintPeers(
+function paintRanges(
   log: HTMLElement,
-  peers?: ReadonlyMap<string, RoomSelection>,
+  name: string,
+  ranges?: Iterable<RoomSelection>,
 ) {
   if (!globalThis.CSS?.highlights) return
-  if (!peers?.size) {
-    CSS.highlights.delete(highlightName)
-    return
-  }
   const highlight = new Highlight()
-  for (const { start, end } of peers.values()) {
+  for (const { start, end } of ranges ?? []) {
     // У каждого сообщения свой диапазон, чтобы не подсвечивать подписи между ними.
     const bodies =
       start.id === end.id ? [messageBody(log, start.id)] : messageBodies(log)
@@ -95,16 +98,27 @@ function paintPeers(
       if (!range.collapsed) highlight.add(range)
     }
   }
-  CSS.highlights.set(highlightName, highlight)
+  if (highlight.size) CSS.highlights.set(name, highlight)
+  else CSS.highlights.delete(name)
 }
 
 export function useSharedSelection(
   log: Ref<HTMLElement | null>,
-  content: () => unknown,
+  content: () => readonly [
+    RoomMessage[],
+    string | undefined,
+    boolean | undefined,
+  ],
   peers: () => ReadonlyMap<string, RoomSelection> | undefined,
+  marks: () => readonly RoomSelection[] | undefined,
   publish: (range: RoomSelection | null) => void,
+  save: (range: RoomSelection) => void,
 ) {
   let frame = 0
+  let completed: RoomSelection | null = null
+  let pointer: number | null = null
+  let keyboard = false
+  const listeners = new AbortController()
   let beforeUpdate: {
     range: RoomSelection
     anchor: Node
@@ -112,15 +126,53 @@ export function useSharedSelection(
     backward: boolean
   } | null = null
 
+  function currentRange() {
+    const selection = document.getSelection()
+    return log.value && selection ? readSelection(log.value, selection) : null
+  }
+
   function selectionChanged() {
     if (frame) return
     frame = requestAnimationFrame(() => {
       frame = 0
-      const selection = document.getSelection()
-      publish(
-        log.value && selection ? readSelection(log.value, selection) : null,
-      )
+      const range = currentRange()
+      publish(sameSelection(range, completed) ? null : range)
     })
+  }
+
+  function finishSelection() {
+    completed = currentRange()
+    if (completed) save(completed)
+    publish(null)
+  }
+
+  function startPointer(event: PointerEvent) {
+    if (!event.isPrimary || event.button !== 0) return
+    pointer = event.pointerId
+    completed = null
+  }
+
+  function endPointer(event: PointerEvent) {
+    if (pointer !== event.pointerId) return
+    pointer = null
+    finishSelection()
+  }
+
+  function startKey(event: KeyboardEvent) {
+    if (
+      event.shiftKey &&
+      /^(Arrow(Left|Right|Up|Down)|Home|End|Page(Up|Down))$/.test(event.key)
+    ) {
+      keyboard = true
+      completed = null
+    }
+  }
+
+  function endKey(event: KeyboardEvent) {
+    if (keyboard && event.key === 'Shift') {
+      keyboard = false
+      finishSelection()
+    }
   }
 
   watch(content, () => {
@@ -141,7 +193,7 @@ export function useSharedSelection(
 
   watch(
     content,
-    () => {
+    ([messages], [previousMessages]) => {
       const box = log.value
       if (!box) return
       const previous = beforeUpdate
@@ -163,7 +215,17 @@ export function useSharedSelection(
         }
         selectionChanged()
       }
-      paintPeers(box, peers())
+      paintRanges(box, highlightName, peers()?.values())
+      const latest = messages[messages.length - 1]
+      // Токены последнего ответа меняют DOM только этого сообщения.
+      if (
+        messages !== previousMessages ||
+        (latest &&
+          marks()?.some(
+            (range) => range.start.id <= latest.id && latest.id <= range.end.id,
+          ))
+      )
+        paintRanges(box, savedHighlightName, marks())
     },
     { flush: 'post' },
   )
@@ -171,19 +233,44 @@ export function useSharedSelection(
   watch(
     peers,
     () => {
-      if (log.value) paintPeers(log.value, peers())
+      if (log.value) paintRanges(log.value, highlightName, peers()?.values())
+    },
+    { flush: 'post' },
+  )
+  watch(
+    marks,
+    () => {
+      if (log.value) paintRanges(log.value, savedHighlightName, marks())
     },
     { flush: 'post' },
   )
 
   onMounted(() => {
-    document.addEventListener('selectionchange', selectionChanged)
-    if (log.value) paintPeers(log.value, peers())
+    const box = log.value
+    if (!box) return
+    const options = { signal: listeners.signal }
+    document.addEventListener('selectionchange', selectionChanged, options)
+    box.addEventListener('pointerdown', startPointer, options)
+    window.addEventListener('pointerup', endPointer, options)
+    window.addEventListener(
+      'pointercancel',
+      () => {
+        pointer = null
+      },
+      options,
+    )
+    // Системные маркеры выделения на сенсорном экране могут отменить pointer-событие.
+    box.addEventListener('touchend', finishSelection, options)
+    box.addEventListener('keydown', startKey, options)
+    window.addEventListener('keyup', endKey, options)
+    paintRanges(box, highlightName, peers()?.values())
+    paintRanges(box, savedHighlightName, marks())
   })
   onUnmounted(() => {
-    document.removeEventListener('selectionchange', selectionChanged)
+    listeners.abort()
     cancelAnimationFrame(frame)
     globalThis.CSS?.highlights?.delete(highlightName)
+    globalThis.CSS?.highlights?.delete(savedHighlightName)
     publish(null)
   })
 }

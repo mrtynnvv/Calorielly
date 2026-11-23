@@ -61,7 +61,9 @@
           </p>
         </div>
       </div>
-      <p v-if="sendError" class="error" role="alert">{{ sendError }}</p>
+      <p v-if="sendError || markError" class="error" role="alert">
+        {{ sendError || markError }}
+      </p>
       <form @submit.prevent="submit">
         <textarea
           v-model="draft"
@@ -103,7 +105,10 @@ const props = defineProps<{
   disabled: boolean
   busy?: boolean
   peerSelections?: ReadonlyMap<string, RoomSelection>
+  savedSelections?: readonly RoomSelection[]
+  markError?: string
   publishSelection?: (range: RoomSelection | null) => void
+  saveMark?: (range: RoomSelection) => void
   send: (channel: Channel, text: string) => Promise<void>
 }>()
 
@@ -117,7 +122,9 @@ if (props.channel === 'ai')
       props.busy,
     ],
     () => props.peerSelections,
+    () => props.savedSelections,
     (range) => props.publishSelection?.(range),
+    (range) => props.saveMark?.(range),
   )
 const draft = ref('')
 const sending = ref(false)
@@ -192,7 +199,8 @@ function handleEnter(event: KeyboardEvent) {
 </script>
 
 <style>
-::highlight(sobes-peer-selection) {
+::highlight(sobes-peer-selection),
+::highlight(sobes-saved-marks) {
   background-color: var(--room-highlight, #ffe294);
   color: #242424;
 }

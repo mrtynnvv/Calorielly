@@ -1,33 +1,39 @@
 <template>
   <main class="room" :data-theme="theme" aria-label="Комната на двоих">
     <p v-if="status" class="connection" role="status">{{ status }}</p>
-    <div class="columns">
-      <ChatPanel
-        channel="ai"
-        title="Чат с ИИ"
-        placeholder="Вопрос для ИИ"
-        :me="me"
-        :connected="connected"
-        :online-authors="onlineAuthors"
-        :messages="aiMessages"
-        :busy="busy"
-        :disabled="aiLocked"
-        :send="sendMessage"
-        :peer-selections="peerSelections"
-        :publish-selection="publishSelection"
-      >
-        <template #actions>
-          <button
-            class="action"
-            type="button"
-            aria-haspopup="dialog"
-            aria-controls="sobes-settings"
-            @click="openSettings"
-          >
-            Параметры
-          </button>
-        </template>
-      </ChatPanel>
+    <RoomSplit>
+      <template #ai>
+        <ChatPanel
+          id="sobes-ai-panel"
+          channel="ai"
+          title="Чат с ИИ"
+          placeholder="Вопрос для ИИ"
+          :me="me"
+          :connected="connected"
+          :online-authors="onlineAuthors"
+          :messages="aiMessages"
+          :busy="busy"
+          :disabled="aiLocked"
+          :send="sendMessage"
+          :peer-selections="peerSelections"
+          :saved-selections="savedSelections"
+          :mark-error="markError"
+          :save-mark="saveMark"
+          :publish-selection="publishSelection"
+        >
+          <template #actions>
+            <button
+              class="action"
+              type="button"
+              aria-haspopup="dialog"
+              aria-controls="sobes-settings"
+              @click="openSettings"
+            >
+              Параметры
+            </button>
+          </template>
+        </ChatPanel>
+      </template>
       <ChatPanel
         channel="chat"
         title="Чат вдвоём"
@@ -39,7 +45,7 @@
         :disabled="!connected"
         :send="sendMessage"
       />
-    </div>
+    </RoomSplit>
     <dialog
       id="sobes-settings"
       ref="settings"
@@ -138,12 +144,22 @@
           <button
             class="action reset"
             type="button"
+            :disabled="!connected || !hasMyMarks"
+            @click="clearMyMarks"
+          >
+            Очистить мои выделения
+          </button>
+          <button
+            class="action reset"
+            type="button"
             :disabled="!canReset"
             @click="resetHistory"
           >
             Сбросить историю ИИ
           </button>
-          <p v-if="error" class="error" role="alert">{{ error }}</p>
+          <p v-if="error || markError" class="error" role="alert">
+            {{ error || markError }}
+          </p>
         </section>
       </div>
     </dialog>
@@ -154,6 +170,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import ChatPanel from './ChatPanel.vue'
+import RoomSplit from './RoomSplit.vue'
 import { type Channel, useRoom } from './useRoom'
 
 const {
@@ -168,6 +185,11 @@ const {
   aiMessages,
   chatMessages,
   peerSelections,
+  savedSelections,
+  markError,
+  hasMyMarks,
+  saveMark,
+  clearMyMarks,
   publishSelection,
   request,
 } = useRoom()
@@ -371,14 +393,6 @@ async function resetHistory() {
   font-size: $size-comment;
 }
 
-.columns {
-  display: grid;
-  flex: 1;
-  gap: 4px;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  min-height: 0;
-}
-
 dialog {
   background: var(--room-surface);
   border: 1px solid var(--room-line);
@@ -518,12 +532,5 @@ dialog {
 .error {
   color: var(--room-error);
   font-size: $size-comment;
-}
-
-@media (width <= 680px) and (orientation: portrait), (width <= 480px) {
-  .columns {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
-  }
 }
 </style>

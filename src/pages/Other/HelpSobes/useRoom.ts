@@ -14,6 +14,19 @@ type RoomModel = { id: string; label: string }
 
 export type SelectionPoint = { id: number; offset: number }
 export type RoomSelection = { start: SelectionPoint; end: SelectionPoint }
+type RoomMark = { id: number; author: string; range: RoomSelection }
+
+export function sameSelection(
+  a: RoomSelection | null,
+  b: RoomSelection | null,
+) {
+  return (
+    a?.start.id === b?.start.id &&
+    a?.start.offset === b?.start.offset &&
+    a?.end.id === b?.end.id &&
+    a?.end.offset === b?.end.offset
+  )
+}
 
 type RoomEvent =
   | {
@@ -24,10 +37,13 @@ type RoomEvent =
       context: { text: string; revision: number }
       busy: boolean
       onlineAuthors?: string[]
+      marks?: RoomMark[]
     }
   | { type: 'delta'; id: number; text: string }
   | { type: 'presence'; onlineAuthors: string[] }
   | { type: 'selection'; peer: string; range: RoomSelection | null }
+  | { type: 'marks'; marks: RoomMark[] }
+  | { type: 'mark-error'; message: string; range?: RoomSelection }
 
 function getAuthorId() {
   const key = 'help-sobes.author'
@@ -67,26 +83,56 @@ export function useRoom() {
   const peerSelections = shallowRef<ReadonlyMap<string, RoomSelection>>(
     new Map(),
   )
+  const marks = shallowRef<RoomMark[]>([])
+  const pendingMarks = shallowRef<RoomSelection[]>([])
+  const markError = ref('')
   let localSelection: RoomSelection | null = null
   let retryDelay = 1000
   let timer: number | undefined
   let socket: WebSocket | undefined
 
-  function sendSelection() {
+  function sendSocket(event: object) {
     if (socket?.readyState === WebSocket.OPEN && connected.value)
-      socket.send(JSON.stringify({ type: 'selection', range: localSelection }))
+      socket.send(JSON.stringify(event))
   }
 
   function publishSelection(range: RoomSelection | null) {
+    if (sameSelection(range, localSelection)) return
+    localSelection = range
+    sendSocket({ type: 'selection', range })
+  }
+
+  function hasOwnMark(range: RoomSelection) {
+    return marks.value.some(
+      (mark) => mark.author === me && sameSelection(mark.range, range),
+    )
+  }
+
+  function saveMark(range: RoomSelection) {
     if (
-      range?.start.id === localSelection?.start.id &&
-      range?.start.offset === localSelection?.start.offset &&
-      range?.end.id === localSelection?.end.id &&
-      range?.end.offset === localSelection?.end.offset
+      hasOwnMark(range) ||
+      pendingMarks.value.some((pending) => sameSelection(pending, range))
     )
       return
-    localSelection = range
-    sendSelection()
+    markError.value = ''
+    pendingMarks.value = [...pendingMarks.value, range]
+    sendSocket({ type: 'mark', range })
+  }
+
+  function receiveMarks(saved: RoomMark[]) {
+    marks.value = saved
+    if (pendingMarks.value.length)
+      pendingMarks.value = pendingMarks.value.filter(
+        (range) => !hasOwnMark(range),
+      )
+  }
+
+  function clearMyMarks() {
+    if (!connected.value) return
+    pendingMarks.value = []
+    markError.value = ''
+    publishSelection(null)
+    sendSocket({ type: 'clear-marks' })
   }
 
   function connect() {
@@ -122,7 +168,18 @@ export function useRoom() {
           : null
         const reconnecting = !connected.value
         connected.value = true
-        if (reconnecting && localSelection) sendSelection()
+        receiveMarks(event.marks ?? [])
+        if (pendingMarks.value.length) {
+          const ids = new Set(event.messages.map((message) => message.id))
+          pendingMarks.value = pendingMarks.value.filter(
+            (range) => ids.has(range.start.id) && ids.has(range.end.id),
+          )
+          if (reconnecting)
+            for (const range of pendingMarks.value)
+              sendSocket({ type: 'mark', range })
+        }
+        if (reconnecting && localSelection)
+          sendSocket({ type: 'selection', range: localSelection })
         status.value = ''
         retryDelay = 1000
       } else if (event.type === 'delta') {
@@ -130,6 +187,15 @@ export function useRoom() {
         if (message && !message.interrupted) message.text += event.text
       } else if (event.type === 'presence') {
         onlineAuthors.value = new Set(event.onlineAuthors)
+      } else if (event.type === 'marks') {
+        receiveMarks(event.marks)
+      } else if (event.type === 'mark-error') {
+        const rejected = event.range
+        if (rejected)
+          pendingMarks.value = pendingMarks.value.filter(
+            (range) => !sameSelection(range, rejected),
+          )
+        markError.value = event.message
       } else if (event.type === 'selection') {
         const peers = new Map(peerSelections.value)
         if (event.range) peers.set(event.peer, event.range)
@@ -194,6 +260,18 @@ export function useRoom() {
     request,
     peerSelections,
     publishSelection,
+    savedSelections: computed(() => [
+      ...marks.value.map((mark) => mark.range),
+      ...pendingMarks.value,
+    ]),
+    hasMyMarks: computed(
+      () =>
+        pendingMarks.value.length > 0 ||
+        marks.value.some((mark) => mark.author === me),
+    ),
+    markError,
+    saveMark,
+    clearMyMarks,
     aiMessages: computed(() =>
       messages.value.filter((item) => item.channel === 'ai'),
     ),
