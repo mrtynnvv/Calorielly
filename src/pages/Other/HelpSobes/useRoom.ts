@@ -6,12 +6,14 @@ export type RoomMessage = {
   channel: Channel
   author: string
   text: string
+  images?: { id: string }[]
   createdAt?: string | null
   interrupted?: boolean
 }
 
 type RoomModel = { id: string; label: string }
 type RoomTodo = { id: string; text: string }
+type RoomText = { text: string; revision: number }
 
 export type SelectionPoint = { id: number; offset: number }
 export type RoomSelection = { start: SelectionPoint; end: SelectionPoint }
@@ -35,7 +37,8 @@ type RoomEvent =
       messages: RoomMessage[]
       model: string
       models: RoomModel[]
-      context: { text: string; revision: number }
+      context: RoomText
+      dictationPrompt: RoomText
       busy: boolean
       onlineAuthors?: string[]
       marks?: RoomMark[]
@@ -81,6 +84,7 @@ export function useRoom() {
   const messages = ref<RoomMessage[]>([])
   const todos = shallowRef<RoomTodo[]>([])
   const context = ref({ text: '', revision: 0 })
+  const dictationPrompt = ref<RoomText>({ text: '', revision: -1 })
   const busy = ref(false)
   const model = ref<string | null>(null)
   const models = ref<RoomModel[]>([])
@@ -167,6 +171,7 @@ export function useRoom() {
         model.value = event.model ?? null
         models.value = event.models ?? []
         context.value = event.context
+        if (event.dictationPrompt) dictationPrompt.value = event.dictationPrompt
         busy.value = event.busy
         onlineAuthors.value = event.onlineAuthors
           ? new Set(event.onlineAuthors)
@@ -253,6 +258,12 @@ export function useRoom() {
     if (!response.ok) {
       if (response.status === 413 && path === '/transcriptions')
         throw new Error('Аудиофрагмент слишком большой.')
+      if (
+        response.status === 413 &&
+        path === '/messages' &&
+        init.body instanceof FormData
+      )
+        throw new Error('Размер изображений превышает допустимый для отправки.')
       const body = await response.json().catch(() => null)
       throw new Error(body?.message || body?.error || 'Сервер отклонил запрос.')
     }
@@ -261,9 +272,11 @@ export function useRoom() {
 
   return {
     me,
+    imageBaseUrl: apiUrl ? apiUrl + '/images/' : '',
     model,
     models,
     context,
+    dictationPrompt,
     todos,
     busy,
     connected,

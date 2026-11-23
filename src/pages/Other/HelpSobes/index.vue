@@ -12,6 +12,7 @@
           :connected="connected"
           :online-authors="onlineAuthors"
           :messages="aiMessages"
+          :image-base-url="imageBaseUrl"
           :busy="busy"
           :disabled="aiLocked"
           :send="sendMessage"
@@ -43,6 +44,7 @@
         :connected="connected"
         :online-authors="onlineAuthors"
         :messages="chatMessages"
+        :image-base-url="imageBaseUrl"
         :disabled="!connected"
         :send="sendMessage"
       />
@@ -82,16 +84,6 @@
               {{ option.label }}
             </label>
           </fieldset>
-          <div class="editor">
-            <label for="sobes-dictation-prompt">Промпт для диктовки</label>
-            <textarea
-              id="sobes-dictation-prompt"
-              :value="dictationPrompt"
-              rows="3"
-              maxlength="4000"
-              @input="setDictationPrompt"
-            />
-          </div>
         </section>
         <section class="settings-section" aria-labelledby="sobes-shared-title">
           <h3 id="sobes-shared-title" class="t-title">Общие настройки</h3>
@@ -99,7 +91,7 @@
           <fieldset
             v-if="models.length"
             class="options"
-            :disabled="!connected || saving || resetting"
+            :disabled="!connected || !!saving || resetting"
             :aria-busy="!!pendingModel"
           >
             <legend>Модель</legend>
@@ -115,38 +107,58 @@
               {{ option.label }}
             </label>
           </fieldset>
-          <form class="editor" @submit.prevent="saveContext">
-            <label for="sobes-context">Базовый контекст для ИИ</label>
+          <form
+            v-for="field in textFields"
+            :key="field.key"
+            class="editor"
+            @submit.prevent="saveText(field.key)"
+          >
+            <label :for="`sobes-${field.key}`">{{ field.label }}</label>
             <textarea
-              id="sobes-context"
-              v-model="draft"
-              rows="6"
-              maxlength="16000"
-              :disabled="saving"
+              :id="`sobes-${field.key}`"
+              v-model="drafts[field.key].text"
+              :rows="field.rows"
+              :maxlength="field.maxLength"
+              :disabled="saving === field.key"
             />
-            <p v-if="conflicted" role="status">
-              Контекст уже изменился. Можно загрузить сохранённый текст или
-              записать свой поверх него.
+            <p v-if="isConflicted(field.key)" role="status">
+              Другой участник изменил этот текст. Можно загрузить сохранённый
+              текст или записать свой поверх него.
+            </p>
+            <p
+              v-else-if="
+                field.key === 'dictation-prompt' &&
+                hasPersonalDraft &&
+                drafts[field.key].text === personalPrompt
+              "
+              role="status"
+            >
+              Это прежний промпт из этого браузера. Сохраните его для обоих
+              участников.
             </p>
             <div class="actions">
               <button
                 type="submit"
                 class="action primary"
-                :disabled="aiLocked || draft === context.text"
+                :disabled="
+                  aiLocked ||
+                  savedTexts[field.key].revision < 0 ||
+                  drafts[field.key].text === savedTexts[field.key].text
+                "
               >
                 {{
-                  saving
+                  saving === field.key
                     ? 'Сохранение…'
-                    : conflicted
+                    : isConflicted(field.key)
                       ? 'Сохранить мою версию'
-                      : 'Сохранить контекст'
+                      : field.saveLabel
                 }}
               </button>
               <button
-                v-if="conflicted"
+                v-if="isConflicted(field.key)"
                 type="button"
                 class="action"
-                @click="loadContext"
+                @click="loadText(field.key)"
               >
                 Загрузить сохранённый текст
               </button>
@@ -212,7 +224,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 
 import ChatPanel from './ChatPanel.vue'
 import RoomSplit from './RoomSplit.vue'
@@ -220,7 +232,9 @@ import { type Channel, useRoom } from './useRoom'
 
 const {
   me,
+  imageBaseUrl,
   context,
+  dictationPrompt,
   todos,
   model,
   models,
@@ -244,12 +258,6 @@ const themes = [
   { value: 'light', label: 'Светлая' },
 ] as const
 const themeKey = 'help-sobes.theme'
-const dictationPromptKey = 'help-sobes.dictation-prompt'
-const defaultDictationPrompt =
-  'Техническое собеседование на русском языке по веб-разработке. Встречаются термины JavaScript, TypeScript, Vue, Nuxt, Pinia, React, Node.js, PostgreSQL, Kafka и RabbitMQ.'
-const dictationPrompt = ref(
-  localStorage.getItem(dictationPromptKey) ?? defaultDictationPrompt,
-)
 const theme = ref<'light' | 'dark'>(
   localStorage.getItem(themeKey) === 'light' ? 'light' : 'dark',
 )
@@ -258,39 +266,57 @@ function setTheme(value: 'light' | 'dark') {
   localStorage.setItem(themeKey, value)
 }
 
-function setDictationPrompt(event: Event) {
-  const value = (event.target as HTMLTextAreaElement).value
-  dictationPrompt.value = value
-  localStorage.setItem(dictationPromptKey, value)
-}
-
 function syncLocalSettings(event: StorageEvent) {
   if (event.storageArea !== localStorage) return
   if (event.key === themeKey || event.key === null)
     theme.value = localStorage.getItem(themeKey) === 'light' ? 'light' : 'dark'
-  if (event.key === dictationPromptKey || event.key === null)
-    dictationPrompt.value =
-      localStorage.getItem(dictationPromptKey) ?? defaultDictationPrompt
 }
 
 onMounted(() => window.addEventListener('storage', syncLocalSettings))
 onUnmounted(() => window.removeEventListener('storage', syncLocalSettings))
 
 const settings = ref<HTMLDialogElement | null>(null)
-const draft = ref('')
-const draftRevision = ref(0)
-const saving = ref(false)
+const textFields = [
+  {
+    key: 'context',
+    label: 'Базовый контекст для ИИ',
+    saveLabel: 'Сохранить контекст',
+    rows: 6,
+    maxLength: 16000,
+  },
+  {
+    key: 'dictation-prompt',
+    label: 'Промпт для диктовки',
+    saveLabel: 'Сохранить промпт',
+    rows: 3,
+    maxLength: 4000,
+  },
+] as const
+type TextKey = (typeof textFields)[number]['key']
+const savedTexts = computed(() => ({
+  context: context.value,
+  'dictation-prompt': dictationPrompt.value,
+}))
+const drafts = reactive({
+  context: { text: '', revision: -1 },
+  'dictation-prompt': { text: '', revision: -1 },
+})
+const personalPrompt = localStorage.getItem('help-sobes.dictation-prompt')
+const hasPersonalDraft = computed(
+  () =>
+    dictationPrompt.value.revision === 0 &&
+    personalPrompt !== null &&
+    personalPrompt !== dictationPrompt.value.text,
+)
+const saving = ref<TextKey | null>(null)
 const resetting = ref(false)
 const pendingModel = ref<string | null>(null)
 const error = ref('')
 const settingsBusy = computed(
-  () => saving.value || resetting.value || !!pendingModel.value,
+  () => !!saving.value || resetting.value || !!pendingModel.value,
 )
 const aiLocked = computed(() => !connected.value || settingsBusy.value)
 const canReset = computed(() => !aiLocked.value && aiMessages.value.length > 0)
-const conflicted = computed(
-  () => !saving.value && draftRevision.value !== context.value.revision,
-)
 const todoDraft = ref('')
 const addingTodo = ref(false)
 const deletingTodos = ref(new Set<string>())
@@ -335,14 +361,26 @@ async function deleteTodo(id: string) {
   }
 }
 
-function loadContext() {
-  draft.value = context.value.text
-  draftRevision.value = context.value.revision
+function loadText(key: TextKey, offerPersonalDraft = false) {
+  const saved = savedTexts.value[key]
+  const usePersonal =
+    key === 'dictation-prompt' && offerPersonalDraft && hasPersonalDraft.value
+  drafts[key] = {
+    revision: saved.revision,
+    text: usePersonal ? personalPrompt! : saved.text,
+  }
   error.value = ''
 }
 
+function isConflicted(key: TextKey) {
+  return (
+    saving.value !== key &&
+    drafts[key].revision !== savedTexts.value[key].revision
+  )
+}
+
 function openSettings() {
-  loadContext()
+  for (const { key } of textFields) loadText(key, true)
   settings.value?.showModal()
 }
 
@@ -350,38 +388,46 @@ function closeSettings() {
   if (!settingsBusy.value) settings.value?.close()
 }
 
-watch(context, (current, previous) => {
-  if (
-    settings.value?.open &&
-    current.revision !== previous.revision &&
-    draft.value === previous.text &&
-    draftRevision.value === previous.revision
-  )
-    loadContext()
+watch(savedTexts, (current, previous) => {
+  if (!settings.value?.open) return
+  for (const { key } of textFields) {
+    if (current[key].revision === previous[key].revision) continue
+    const draft = drafts[key]
+    if (
+      draft.text === current[key].text ||
+      (draft.text === previous[key].text &&
+        draft.revision === previous[key].revision)
+    )
+      loadText(key, true)
+  }
 })
 
-async function saveContext() {
-  if (!connected.value || saving.value || draft.value === context.value.text)
+async function saveText(key: TextKey) {
+  const current = savedTexts.value[key]
+  const draft = drafts[key]
+  if (!connected.value || settingsBusy.value || draft.text === current.text)
     return
-  const revision = conflicted.value
-    ? context.value.revision
-    : draftRevision.value
-  saving.value = true
+  const revision = isConflicted(key) ? current.revision : draft.revision
+  saving.value = key
   error.value = ''
   try {
-    await request('/context', {
+    await request(`/${key}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: draft.value, revision }),
+      body: JSON.stringify({ text: draft.text, revision }),
     })
   } catch (cause) {
     error.value =
-      cause instanceof Error ? cause.message : 'Не удалось сохранить контекст.'
+      cause instanceof Error ? cause.message : 'Не удалось сохранить текст.'
     return
   } finally {
-    saving.value = false
+    saving.value = null
   }
-  closeSettings()
+  if (
+    key === 'context' &&
+    drafts['dictation-prompt'].text === dictationPrompt.value.text
+  )
+    closeSettings()
 }
 
 async function changeModel(id: string) {
@@ -405,7 +451,6 @@ async function changeModel(id: string) {
 async function transcribeDictation(audio: Blob, signal: AbortSignal) {
   const form = new FormData()
   form.append('file', audio, 'fragment.wav')
-  form.append('prompt', dictationPrompt.value)
   const response = await request('/transcriptions', {
     method: 'POST',
     body: form,
@@ -417,7 +462,16 @@ async function transcribeDictation(audio: Blob, signal: AbortSignal) {
   return text
 }
 
-async function sendMessage(channel: Channel, text: string) {
+async function sendMessage(channel: Channel, text: string, images: File[]) {
+  if (images.length) {
+    const form = new FormData()
+    form.append('channel', channel)
+    form.append('author', me)
+    form.append('text', text)
+    for (const image of images) form.append('images', image)
+    await request('/messages', { method: 'POST', body: form })
+    return
+  }
   await request('/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

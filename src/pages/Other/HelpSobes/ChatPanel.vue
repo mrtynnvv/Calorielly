@@ -1,6 +1,6 @@
 <template>
   <UiBlock class="panel">
-    <section :aria-labelledby="channel + '-title'">
+    <section :aria-labelledby="channel + '-title'" @paste="paste">
       <header>
         <h2 :id="channel + '-title'" class="t-title">{{ title }}</h2>
         <AuthorLabel
@@ -53,12 +53,30 @@
             <p v-if="message.interrupted" class="notice">Ответ прерван</p>
           </template>
           <p
-            v-else
+            v-else-if="message.text"
             class="body"
             :data-selection-message="channel === 'ai' ? message.id : undefined"
           >
             {{ message.text }}
           </p>
+          <div
+            v-if="message.images?.length && imageBaseUrl"
+            class="message-images"
+          >
+            <a
+              v-for="(image, position) in message.images"
+              :key="image.id"
+              :href="imageBaseUrl + image.id"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                :src="imageBaseUrl + image.id"
+                :alt="'Изображение ' + (position + 1) + ' в сообщении'"
+                loading="lazy"
+              />
+            </a>
+          </div>
         </div>
       </div>
       <p
@@ -68,6 +86,33 @@
       >
         {{ sendError || microphoneError || markError }}
       </p>
+      <div
+        v-if="images.length || preparing"
+        class="draft-images"
+        aria-label="Вложения"
+      >
+        <div
+          v-for="(image, position) in images"
+          :key="image.url"
+          class="draft-image"
+        >
+          <img
+            :src="image.url"
+            :alt="'Прикреплённое изображение ' + (position + 1)"
+          />
+          <button
+            type="button"
+            :aria-label="'Убрать изображение ' + (position + 1)"
+            :disabled="sending"
+            @click="discard([image])"
+          >
+            ×
+          </button>
+        </div>
+        <span v-if="preparing" class="notice" role="status"
+          >Подготовка изображения…</span
+        >
+      </div>
       <form @submit.prevent="submit">
         <textarea
           ref="input"
@@ -123,7 +168,11 @@
           type="submit"
           text="Отправить"
           class="send"
-          :disabled="disabled || sending || (!draft.trim() && phase === 'idle')"
+          :disabled="
+            disabled ||
+            sending ||
+            (!draft.trim() && !images.length && !preparing && phase === 'idle')
+          "
         />
       </form>
     </section>
@@ -136,6 +185,7 @@ import { computed, ref, watch } from 'vue'
 import AssistantReply from './AssistantReply.vue'
 import AuthorLabel from './AuthorLabel.vue'
 import { useDictation, type Transcribe } from './useDictation'
+import { usePastedImages } from './usePastedImages'
 import type { Channel, RoomMessage, RoomSelection } from './useRoom'
 import { useSharedSelection } from './useSharedSelection'
 
@@ -147,6 +197,7 @@ const props = defineProps<{
   title: string
   placeholder: string
   messages: RoomMessage[]
+  imageBaseUrl: string
   me: string
   connected: boolean
   onlineAuthors: ReadonlySet<string> | null
@@ -158,7 +209,7 @@ const props = defineProps<{
   markError?: string
   publishSelection?: (range: RoomSelection | null) => void
   saveMark?: (range: RoomSelection) => void
-  send: (channel: Channel, text: string) => Promise<void>
+  send: (channel: Channel, text: string, images: File[]) => Promise<void>
 }>()
 
 const log = ref<HTMLElement | null>(null)
@@ -242,6 +293,8 @@ watch(
 
 const sending = ref(false)
 const sendError = ref('')
+const { images, preparing, paste, discard, finishPreparing } =
+  usePastedImages(sendError)
 let followLatest = true
 
 function presenceFor(author?: string) {
@@ -288,16 +341,26 @@ async function submit() {
   sendError.value = ''
   followLatest = true
   try {
-    if (phase.value !== 'idle' && !(await finish())) return
+    const [dictationReady, imagesReady] = await Promise.all([
+      phase.value === 'idle' || finish(),
+      !preparing.value || finishPreparing(),
+    ])
+    if (!dictationReady || !imagesReady) return
     const original = draft.value
     const text = original.trim()
-    if (!text || props.disabled) return
+    const attachments = images.value
+    if ((!text && !attachments.length) || props.disabled) return
     if (text.length > 8000) {
       sendError.value = 'Сообщение может содержать до 8000 символов.'
       return
     }
-    await props.send(props.channel, text)
+    await props.send(
+      props.channel,
+      text,
+      attachments.map((image) => image.file),
+    )
     if (draft.value === original) draft.value = ''
+    discard(attachments)
   } catch (error) {
     sendError.value =
       error instanceof Error ? error.message : 'Не удалось отправить сообщение.'
@@ -390,6 +453,65 @@ header {
 .body {
   font-size: $size-main;
   white-space: pre-wrap;
+}
+
+.draft-images,
+.message-images {
+  display: flex;
+  gap: 5px;
+}
+
+.message-images {
+  flex-wrap: wrap;
+  margin-block-start: 3px;
+
+  a {
+    max-width: 100%;
+  }
+
+  img {
+    border-radius: 4px;
+    display: block;
+    max-height: 180px;
+    max-width: 100%;
+  }
+}
+
+.draft-images {
+  align-items: center;
+  flex: none;
+  overflow-x: auto;
+}
+
+.draft-image {
+  flex: none;
+  position: relative;
+
+  img {
+    border: 1px solid var(--room-line);
+    border-radius: 5px;
+    display: block;
+    height: 54px;
+    object-fit: cover;
+    width: 68px;
+  }
+
+  button {
+    align-items: center;
+    background: var(--room-surface);
+    border: 1px solid var(--room-field-border);
+    border-radius: 50%;
+    color: var(--room-text);
+    cursor: pointer;
+    display: flex;
+    font-size: 15px;
+    height: 22px;
+    inset: 2px 2px auto auto;
+    justify-content: center;
+    padding: 0;
+    position: absolute;
+    width: 22px;
+  }
 }
 
 textarea {
