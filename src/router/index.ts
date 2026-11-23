@@ -29,6 +29,12 @@ const routes = [
     meta: { blank: true },
   }, //blank: true отрисовывает компонент без хедера, меню и тд
   // Other
+  {
+    path: '/help-sobes',
+    name: 'help-sobes',
+    component: () => import('@/pages/Other/HelpSobes/index.vue'),
+    meta: { blank: true, roomInvite: true },
+  },
   { path: '/budget', component: budget, meta: { blank: true } },
   { path: '/game', component: game, meta: { blank: true } },
   { path: '/mileage', component: mileage, meta: { blank: true } },
@@ -44,6 +50,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  if (to.meta.roomInvite) return true
   if (IS_DEMO) {
     if (to.path === '/auth') return '/feed'
     return true

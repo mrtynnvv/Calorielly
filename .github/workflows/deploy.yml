@@ -32,6 +32,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Build
+        env:
+          VITE_SOBES_API_URL: ${{ vars.VITE_SOBES_API_URL || 'https://mrtynnvv.site/help-sobes-api' }}
         run: npm run build
       - name: SPA fallback (copy 404.html)
         run: cp dist/index.html dist/404.html
