@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 
 export type Channel = 'ai' | 'chat'
 export type RoomMessage = {
@@ -11,6 +11,9 @@ export type RoomMessage = {
 
 type RoomModel = { id: string; label: string }
 
+export type SelectionPoint = { id: number; offset: number }
+export type RoomSelection = { start: SelectionPoint; end: SelectionPoint }
+
 type RoomEvent =
   | {
       type: 'state'
@@ -21,6 +24,7 @@ type RoomEvent =
       busy: boolean
     }
   | { type: 'delta'; id: number; text: string }
+  | { type: 'selection'; peer: string; range: RoomSelection | null }
 
 function getAuthorId() {
   const key = 'help-sobes.author'
@@ -56,10 +60,31 @@ export function useRoom() {
   const busy = ref(false)
   const model = ref<string | null>(null)
   const models = ref<RoomModel[]>([])
+  const peerSelections = shallowRef<ReadonlyMap<string, RoomSelection>>(
+    new Map(),
+  )
+  let localSelection: RoomSelection | null = null
   let disposed = false
   let retryDelay = 1000
   let timer: number | undefined
   let socket: WebSocket | undefined
+
+  function sendSelection() {
+    if (socket?.readyState === WebSocket.OPEN && connected.value)
+      socket.send(JSON.stringify({ type: 'selection', range: localSelection }))
+  }
+
+  function publishSelection(range: RoomSelection | null) {
+    if (
+      range?.start.id === localSelection?.start.id &&
+      range?.start.offset === localSelection?.start.offset &&
+      range?.end.id === localSelection?.end.id &&
+      range?.end.offset === localSelection?.end.offset
+    )
+      return
+    localSelection = range
+    sendSelection()
+  }
 
   function connect() {
     if (!apiUrl) {
@@ -78,17 +103,25 @@ export function useRoom() {
         models.value = event.models ?? []
         context.value = event.context
         busy.value = event.busy
+        const reconnecting = !connected.value
         connected.value = true
+        if (reconnecting && localSelection) sendSelection()
         status.value = ''
         retryDelay = 1000
       } else if (event.type === 'delta') {
         const message = messages.value.find((item) => item.id === event.id)
         if (message && !message.interrupted) message.text += event.text
+      } else if (event.type === 'selection') {
+        const peers = new Map(peerSelections.value)
+        if (event.range) peers.set(event.peer, event.range)
+        else peers.delete(event.peer)
+        peerSelections.value = peers
       }
     }
     socket.onclose = () => {
       if (disposed) return
       connected.value = false
+      peerSelections.value = new Map()
       status.value = 'Связь прервалась. Переподключение…'
       timer = window.setTimeout(connect, retryDelay)
       retryDelay = Math.min(retryDelay * 2, 10000)
@@ -125,6 +158,8 @@ export function useRoom() {
     connected,
     status,
     request,
+    peerSelections,
+    publishSelection,
     aiMessages: computed(() =>
       messages.value.filter((item) => item.channel === 'ai'),
     ),

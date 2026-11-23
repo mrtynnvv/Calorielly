@@ -2,10 +2,10 @@
   <UiBlock class="panel">
     <section :aria-labelledby="channel + '-title'">
       <header>
-        <h2 :id="channel + '-title'" class="t-title-XL">{{ title }}</h2>
+        <h2 :id="channel + '-title'" class="t-title">{{ title }}</h2>
+        <span v-if="busy" class="notice" role="status">ИИ отвечает…</span>
         <slot name="actions" />
       </header>
-      <slot name="context" />
       <div
         ref="log"
         class="log"
@@ -33,6 +33,7 @@
           <template v-if="message.author === 'assistant'">
             <AssistantReply
               v-if="message.text"
+              :data-selection-message="channel === 'ai' ? message.id : undefined"
               :text="message.text"
               :incomplete="
                 message.interrupted || (busy && index === messages.length - 1)
@@ -40,15 +41,18 @@
             />
             <p v-if="message.interrupted" class="notice">Ответ прерван</p>
           </template>
-          <p v-else class="body">{{ message.text }}</p>
+          <p
+            v-else
+            class="body"
+            :data-selection-message="channel === 'ai' ? message.id : undefined"
+          >{{ message.text }}</p>
         </div>
       </div>
-      <p v-if="busy" class="notice" role="status">ИИ отвечает…</p>
       <p v-if="sendError" class="error" role="alert">{{ sendError }}</p>
       <form @submit.prevent="submit">
         <textarea
           v-model="draft"
-          rows="2"
+          rows="1"
           :placeholder="placeholder"
           :aria-label="placeholder"
           @keydown.enter="handleEnter"
@@ -68,7 +72,8 @@
 import { ref, watch } from 'vue'
 
 import AssistantReply from './AssistantReply.vue'
-import type { Channel, RoomMessage } from './useRoom'
+import type { Channel, RoomMessage, RoomSelection } from './useRoom'
+import { useSharedSelection } from './useSharedSelection'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
 import UiButton from '@/components/ui/UiButton.vue'
@@ -81,10 +86,23 @@ const props = defineProps<{
   me: string
   disabled: boolean
   busy?: boolean
+  peerSelections?: ReadonlyMap<string, RoomSelection>
+  publishSelection?: (range: RoomSelection | null) => void
   send: (channel: Channel, text: string) => Promise<void>
 }>()
 
 const log = ref<HTMLElement | null>(null)
+if (props.channel === 'ai')
+  useSharedSelection(
+    log,
+    () => [
+      props.messages,
+      props.messages[props.messages.length - 1]?.text,
+      props.busy,
+    ],
+    () => props.peerSelections,
+    (range) => props.publishSelection?.(range),
+  )
 const draft = ref('')
 const sending = ref(false)
 const sendError = ref('')
@@ -147,17 +165,25 @@ function handleEnter(event: KeyboardEvent) {
 }
 </script>
 
+<style>
+::highlight(sobes-peer-selection) {
+  background-color: #ffe294;
+  color: #242424;
+}
+</style>
+
 <style scoped lang="scss">
 .panel {
+  border-radius: 10px;
   min-height: 0;
   min-width: 0;
-  padding: clamp(14px, 2vw, 24px);
+  padding: 5px 8px;
 }
 
 section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
   height: 100%;
 }
 
@@ -165,12 +191,15 @@ header,
 form {
   align-items: center;
   display: flex;
-  gap: 12px;
-  justify-content: space-between;
+  gap: 6px;
 }
 
 header {
-  flex-wrap: wrap;
+  min-height: 28px;
+
+  h2 {
+    margin-inline-end: auto;
+  }
 }
 
 .log {
@@ -178,18 +207,20 @@ header {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-height: 0;
   overflow-y: auto;
-  padding-block: 12px;
+  overscroll-behavior: contain;
+  padding-block: 6px;
 }
 
 .message {
   align-self: flex-start;
   background: $palette-bg;
-  border-radius: 12px;
-  max-width: 95%;
-  padding: 8px 12px;
+  border-radius: 8px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 5px 9px;
 }
 
 .own {
@@ -212,17 +243,24 @@ header {
 textarea {
   border: 1px solid #aeb4bc;
   border-radius: 8px;
+  field-sizing: content;
   flex: 1;
+  font-size: 16px;
+  line-height: 22px;
+  max-height: 76px;
+  min-height: 34px;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 5px 8px;
   resize: none;
 }
 
 .send {
   background: #1664ad;
   flex: none;
+  font-size: $size-comment;
+  height: 34px;
   margin: 0;
-  padding-inline: 14px;
+  padding-inline: 10px;
   width: auto;
 }
 

@@ -11,84 +11,19 @@
         :busy="busy"
         :disabled="aiLocked"
         :send="sendMessage"
+        :peer-selections="peerSelections"
+        :publish-selection="publishSelection"
       >
         <template #actions>
-          <div class="actions">
-            <div v-if="models.length" class="model-select">
-              <UiSelect
-                aria-label="Модель ИИ"
-                :model-value="model"
-                :options="modelOptions"
-                :disabled="!connected || changingModel"
-                @update:model-value="changeModel"
-              />
-            </div>
-            <button
-              ref="editButton"
-              class="action"
-              :disabled="!connected || editing"
-              @click="openEditor"
-            >
-              Обновить контекст
-            </button>
-            <button class="action" :disabled="!canReset" @click="resetHistory">
-              Сбросить историю ИИ
-            </button>
-          </div>
-        </template>
-        <template #context>
-          <form
-            v-if="editing"
-            class="editor"
-            @submit.prevent="saveContext"
-            @keydown.esc.prevent="closeEditor"
+          <button
+            class="action"
+            type="button"
+            aria-haspopup="dialog"
+            aria-controls="sobes-settings"
+            @click="openSettings"
           >
-            <label for="sobes-context">Базовый контекст для ИИ</label>
-            <textarea
-              id="sobes-context"
-              ref="editor"
-              v-model="draft"
-              rows="4"
-              maxlength="16000"
-              :disabled="saving"
-            />
-            <p v-if="conflicted" role="status">
-              Контекст уже изменился. Можно загрузить сохранённый текст или
-              записать свой поверх него.
-            </p>
-            <div class="actions">
-              <button
-                type="submit"
-                class="action primary"
-                :disabled="!connected || saving || draft === context.text"
-              >
-                {{
-                  saving
-                    ? 'Сохранение…'
-                    : conflicted
-                      ? 'Сохранить мою версию'
-                      : 'Сохранить'
-                }}
-              </button>
-              <button
-                v-if="conflicted"
-                class="action"
-                type="button"
-                @click="loadContext"
-              >
-                Загрузить сохранённый текст
-              </button>
-              <button
-                type="button"
-                class="action"
-                :disabled="saving"
-                @click="closeEditor"
-              >
-                Отмена
-              </button>
-            </div>
-          </form>
-          <p v-if="error" class="error" role="alert">{{ error }}</p>
+            Параметры
+          </button>
         </template>
       </ChatPanel>
       <ChatPanel
@@ -101,16 +36,104 @@
         :send="sendMessage"
       />
     </div>
+    <dialog
+      id="sobes-settings"
+      ref="settings"
+      aria-labelledby="sobes-settings-title"
+      @click.self="closeSettings"
+      @cancel.prevent="closeSettings"
+    >
+      <div class="settings-content">
+        <header class="settings-header">
+          <h2 id="sobes-settings-title" class="t-title">Параметры чата с ИИ</h2>
+          <button
+            class="action close"
+            type="button"
+            aria-label="Закрыть параметры"
+            :disabled="settingsBusy"
+            @click="closeSettings"
+          >
+            <img src="@/assets/close-gray.svg" alt="" width="16" height="16" />
+          </button>
+        </header>
+        <p v-if="status" class="connection" role="status">{{ status }}</p>
+        <fieldset
+          v-if="models.length"
+          class="models"
+          :disabled="!connected || saving || resetting"
+          :aria-busy="!!pendingModel"
+        >
+          <legend class="t-title">Модель</legend>
+          <label v-for="option in models" :key="option.id" class="model-option">
+            <input
+              type="radio"
+              name="sobes-model"
+              :value="option.id"
+              :disabled="pendingModel !== null && pendingModel !== option.id"
+              :checked="(pendingModel ?? model) === option.id"
+              @change="changeModel(option.id)"
+            />
+            {{ option.label }}
+          </label>
+        </fieldset>
+        <form class="editor" @submit.prevent="saveContext">
+          <label class="t-title" for="sobes-context"
+            >Базовый контекст для ИИ</label
+          >
+          <textarea
+            id="sobes-context"
+            v-model="draft"
+            rows="6"
+            maxlength="16000"
+            :disabled="saving"
+          />
+          <p v-if="conflicted" role="status">
+            Контекст уже изменился. Можно загрузить сохранённый текст или
+            записать свой поверх него.
+          </p>
+          <div class="actions">
+            <button
+              type="submit"
+              class="action primary"
+              :disabled="aiLocked || draft === context.text"
+            >
+              {{
+                saving
+                  ? 'Сохранение…'
+                  : conflicted
+                    ? 'Сохранить мою версию'
+                    : 'Сохранить контекст'
+              }}
+            </button>
+            <button
+              v-if="conflicted"
+              type="button"
+              class="action"
+              @click="loadContext"
+            >
+              Загрузить сохранённый текст
+            </button>
+          </div>
+        </form>
+        <button
+          class="action reset"
+          type="button"
+          :disabled="!canReset"
+          @click="resetHistory"
+        >
+          Сбросить историю ИИ
+        </button>
+        <p v-if="error" class="error" role="alert">{{ error }}</p>
+      </div>
+    </dialog>
   </main>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import ChatPanel from './ChatPanel.vue'
 import { type Channel, useRoom } from './useRoom'
-
-import UiSelect from '@/components/ui/UiSelect.vue'
 
 const {
   me,
@@ -122,27 +145,22 @@ const {
   status,
   aiMessages,
   chatMessages,
+  peerSelections,
+  publishSelection,
   request,
 } = useRoom()
-const editButton = ref<HTMLButtonElement | null>(null)
-const editor = ref<HTMLTextAreaElement | null>(null)
-const editing = ref(false)
+const settings = ref<HTMLDialogElement | null>(null)
 const draft = ref('')
 const draftRevision = ref(0)
 const saving = ref(false)
 const resetting = ref(false)
-const changingModel = ref(false)
-const modelOptions = computed(() =>
-  models.value.map(({ id, label }) => ({ value: id, label })),
-)
+const pendingModel = ref<string | null>(null)
 const error = ref('')
-const aiLocked = computed(
-  () =>
-    !connected.value || resetting.value || saving.value || changingModel.value,
+const settingsBusy = computed(
+  () => saving.value || resetting.value || !!pendingModel.value,
 )
-const canReset = computed(
-  () => connected.value && !resetting.value && aiMessages.value.length > 0,
-)
+const aiLocked = computed(() => !connected.value || settingsBusy.value)
+const canReset = computed(() => !aiLocked.value && aiMessages.value.length > 0)
 const conflicted = computed(
   () => !saving.value && draftRevision.value !== context.value.revision,
 )
@@ -153,20 +171,24 @@ function loadContext() {
   error.value = ''
 }
 
-async function openEditor() {
+function openSettings() {
   loadContext()
-  editing.value = true
-  await nextTick()
-  editor.value?.focus()
+  settings.value?.showModal()
 }
 
-async function closeEditor() {
-  if (saving.value) return
-  editing.value = false
-  error.value = ''
-  await nextTick()
-  editButton.value?.focus()
+function closeSettings() {
+  if (!settingsBusy.value) settings.value?.close()
 }
+
+watch(context, (current, previous) => {
+  if (
+    settings.value?.open &&
+    current.revision !== previous.revision &&
+    draft.value === previous.text &&
+    draftRevision.value === previous.revision
+  )
+    loadContext()
+})
 
 async function saveContext() {
   if (!connected.value || saving.value || draft.value === context.value.text)
@@ -189,12 +211,12 @@ async function saveContext() {
   } finally {
     saving.value = false
   }
-  await closeEditor()
+  closeSettings()
 }
 
 async function changeModel(id: string) {
-  if (!connected.value || changingModel.value || id === model.value) return
-  changingModel.value = true
+  if (!connected.value || settingsBusy.value || id === model.value) return
+  pendingModel.value = id
   error.value = ''
   try {
     await request('/model', {
@@ -206,7 +228,7 @@ async function changeModel(id: string) {
     error.value =
       cause instanceof Error ? cause.message : 'Не удалось изменить модель.'
   } finally {
-    changingModel.value = false
+    pendingModel.value = null
   }
 }
 
@@ -243,35 +265,91 @@ async function resetHistory() {
 .room {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
   height: 100dvh;
-  margin: 0 auto;
-  max-width: 1600px;
-  padding: clamp(10px, 2vw, 28px);
+  padding: 4px;
 }
 
 .connection {
   color: $color-comment;
-  font-size: $size-main;
+  font-size: $size-comment;
 }
 
 .columns {
   display: grid;
   flex: 1;
-  gap: 14px;
+  gap: 4px;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   min-height: 0;
 }
 
+dialog {
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  color: $color-main;
+  margin: auto;
+  max-height: calc(100dvh - 16px);
+  overscroll-behavior: contain;
+  padding: 0;
+  width: min(520px, calc(100% - 16px));
+
+  &::backdrop {
+    background: rgb(0 0 0 / 45%);
+  }
+}
+
+.settings-content {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.settings-header,
 .actions {
   align-items: center;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
-.model-select {
-  width: min(230px, 100%);
+.settings-header {
+  justify-content: space-between;
+}
+
+.actions {
+  flex-wrap: wrap;
+}
+
+.models {
+  border: 0;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+
+  legend {
+    margin-bottom: 6px;
+  }
+}
+
+.model-option {
+  align-items: center;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  font-size: $size-main;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 10px;
+
+  input {
+    accent-color: #1664ad;
+  }
+
+  &:has(:checked) {
+    background: #e8f3ff;
+    border-color: #1664ad;
+  }
 }
 
 .editor {
@@ -284,22 +362,23 @@ async function resetHistory() {
     border: 1px solid #aeb4bc;
     border-radius: 8px;
     color: $color-main;
-    font-size: $size-main;
+    font-size: 16px;
+    max-height: 40dvh;
     min-width: 0;
     padding: 8px 10px;
-    resize: none;
+    resize: vertical;
   }
 }
 
 .action {
   background: $palette-bg;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   color: $color-main;
   cursor: pointer;
   font-size: $size-comment;
-  min-height: 32px;
-  padding: 4px 10px;
+  min-height: 28px;
+  padding: 3px 9px;
 
   &:disabled {
     cursor: default;
@@ -307,9 +386,20 @@ async function resetHistory() {
   }
 }
 
+.close {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-width: 32px;
+}
+
 .primary {
   background: #1664ad;
   color: #fff;
+}
+
+.reset {
+  justify-self: start;
 }
 
 .error {
@@ -317,14 +407,10 @@ async function resetHistory() {
   font-size: $size-comment;
 }
 
-@media (width <= 760px) {
-  .room {
-    height: auto;
-  }
-
+@media (width <= 680px) and (orientation: portrait), (width <= 480px) {
   .columns {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: repeat(2, max(440px, 70dvh));
+    grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
   }
 }
 </style>
