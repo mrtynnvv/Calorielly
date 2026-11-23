@@ -6,6 +6,7 @@ export type RoomMessage = {
   channel: Channel
   author: string
   text: string
+  interrupted?: boolean
 }
 
 type RoomModel = { id: string; label: string }
@@ -82,7 +83,7 @@ export function useRoom() {
         retryDelay = 1000
       } else if (event.type === 'delta') {
         const message = messages.value.find((item) => item.id === event.id)
-        if (message) message.text += event.text
+        if (message && !message.interrupted) message.text += event.text
       }
     }
     socket.onclose = () => {

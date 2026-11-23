@@ -15,9 +15,9 @@ const markdown = new MarkdownIt('commonmark', {
 </script>
 
 <script setup lang="ts">
-const props = defineProps<{ text: string; streaming?: boolean }>()
+const props = defineProps<{ text: string; incomplete?: boolean }>()
 const html = computed(() => {
-  if (!props.streaming) return markdown.render(props.text)
+  if (!props.incomplete) return markdown.render(props.text)
   if (/^\*{1,3}$/.test(props.text.trim())) return ''
   const preview = remend(props.text, {
     links: false,

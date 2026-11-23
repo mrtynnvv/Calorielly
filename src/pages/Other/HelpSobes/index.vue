@@ -138,11 +138,7 @@ const modelOptions = computed(() =>
 const error = ref('')
 const aiLocked = computed(
   () =>
-    !connected.value ||
-    busy.value ||
-    resetting.value ||
-    saving.value ||
-    changingModel.value,
+    !connected.value || resetting.value || saving.value || changingModel.value,
 )
 const canReset = computed(
   () => connected.value && !resetting.value && aiMessages.value.length > 0,

@@ -30,11 +30,16 @@
                   : 'Друг'
             }}
           </p>
-          <AssistantReply
-            v-if="message.author === 'assistant'"
-            :text="message.text"
-            :streaming="busy && index === messages.length - 1"
-          />
+          <template v-if="message.author === 'assistant'">
+            <AssistantReply
+              v-if="message.text"
+              :text="message.text"
+              :incomplete="
+                message.interrupted || (busy && index === messages.length - 1)
+              "
+            />
+            <p v-if="message.interrupted" class="notice">Ответ прерван</p>
+          </template>
           <p v-else class="body">{{ message.text }}</p>
         </div>
       </div>
@@ -115,12 +120,17 @@ watch(
 
 async function submit() {
   const original = draft.value
-  if (props.disabled || sending.value || !original.trim()) return
+  const text = original.trim()
+  if (props.disabled || sending.value || !text) return
+  if (text.length > 8000) {
+    sendError.value = 'Сообщение может содержать до 8000 символов.'
+    return
+  }
   sending.value = true
   sendError.value = ''
   followLatest = true
   try {
-    await props.send(props.channel, original.trim())
+    await props.send(props.channel, text)
     if (draft.value === original) draft.value = ''
   } catch (error) {
     sendError.value =
