@@ -15,6 +15,7 @@
           :busy="busy"
           :disabled="aiLocked"
           :send="sendMessage"
+          :transcribe="transcribeDictation"
           :peer-selections="peerSelections"
           :saved-selections="savedSelections"
           :mark-error="markError"
@@ -81,6 +82,16 @@
               {{ option.label }}
             </label>
           </fieldset>
+          <div class="editor">
+            <label for="sobes-dictation-prompt">Промпт для диктовки</label>
+            <textarea
+              id="sobes-dictation-prompt"
+              :value="dictationPrompt"
+              rows="3"
+              maxlength="4000"
+              @input="setDictationPrompt"
+            />
+          </div>
         </section>
         <section class="settings-section" aria-labelledby="sobes-shared-title">
           <h3 id="sobes-shared-title" class="t-title">Общие настройки</h3>
@@ -198,6 +209,12 @@ const themes = [
   { value: 'light', label: 'Светлая' },
 ] as const
 const themeKey = 'help-sobes.theme'
+const dictationPromptKey = 'help-sobes.dictation-prompt'
+const defaultDictationPrompt =
+  'Техническое собеседование на русском языке по веб-разработке. Встречаются термины JavaScript, TypeScript, Vue, Nuxt, Pinia, React, Node.js, PostgreSQL, Kafka и RabbitMQ.'
+const dictationPrompt = ref(
+  localStorage.getItem(dictationPromptKey) ?? defaultDictationPrompt,
+)
 const theme = ref<'light' | 'dark'>(
   localStorage.getItem(themeKey) === 'light' ? 'light' : 'dark',
 )
@@ -206,16 +223,23 @@ function setTheme(value: 'light' | 'dark') {
   localStorage.setItem(themeKey, value)
 }
 
-function syncTheme(event: StorageEvent) {
-  if (
-    event.storageArea === localStorage &&
-    (event.key === themeKey || event.key === null)
-  )
-    theme.value = event.newValue === 'light' ? 'light' : 'dark'
+function setDictationPrompt(event: Event) {
+  const value = (event.target as HTMLTextAreaElement).value
+  dictationPrompt.value = value
+  localStorage.setItem(dictationPromptKey, value)
 }
 
-onMounted(() => window.addEventListener('storage', syncTheme))
-onUnmounted(() => window.removeEventListener('storage', syncTheme))
+function syncLocalSettings(event: StorageEvent) {
+  if (event.storageArea !== localStorage) return
+  if (event.key === themeKey || event.key === null)
+    theme.value = localStorage.getItem(themeKey) === 'light' ? 'light' : 'dark'
+  if (event.key === dictationPromptKey || event.key === null)
+    dictationPrompt.value =
+      localStorage.getItem(dictationPromptKey) ?? defaultDictationPrompt
+}
+
+onMounted(() => window.addEventListener('storage', syncLocalSettings))
+onUnmounted(() => window.removeEventListener('storage', syncLocalSettings))
 
 const settings = ref<HTMLDialogElement | null>(null)
 const draft = ref('')
@@ -300,8 +324,23 @@ async function changeModel(id: string) {
   }
 }
 
-function sendMessage(channel: Channel, text: string) {
-  return request('/messages', {
+async function transcribeDictation(audio: Blob, signal: AbortSignal) {
+  const form = new FormData()
+  form.append('file', audio, 'fragment.wav')
+  form.append('prompt', dictationPrompt.value)
+  const response = await request('/transcriptions', {
+    method: 'POST',
+    body: form,
+    signal,
+  })
+  const text: unknown = (await response.json().catch(() => null))?.text
+  if (typeof text !== 'string')
+    throw new Error('Сервер не вернул текст диктовки.')
+  return text
+}
+
+async function sendMessage(channel: Channel, text: string) {
+  await request('/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ channel, text, author: me }),

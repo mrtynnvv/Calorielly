@@ -61,22 +61,69 @@
           </p>
         </div>
       </div>
-      <p v-if="sendError || markError" class="error" role="alert">
-        {{ sendError || markError }}
+      <p
+        v-if="sendError || microphoneError || markError"
+        class="error"
+        role="alert"
+      >
+        {{ sendError || microphoneError || markError }}
       </p>
       <form @submit.prevent="submit">
         <textarea
+          ref="input"
           v-model="draft"
           rows="1"
           :placeholder="placeholder"
           :aria-label="placeholder"
           @keydown.enter="handleEnter"
+          @compositionstart="composing = true"
+          @compositionend="endComposition"
         />
+        <button
+          v-if="channel === 'ai' && transcribe"
+          type="button"
+          class="microphone"
+          :class="{ recording: phase === 'recording' }"
+          :aria-label="microphoneLabel"
+          :title="microphoneLabel"
+          :aria-pressed="phase === 'recording' || phase === 'starting'"
+          :aria-busy="phase === 'starting' || phase === 'finishing'"
+          :disabled="
+            sending || phase === 'finishing' || (!connected && phase === 'idle')
+          "
+          @mousedown.prevent
+          @click="toggleMicrophone"
+        >
+          <svg
+            aria-hidden="true"
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <rect
+              v-if="phase === 'recording' || phase === 'starting'"
+              x="5"
+              y="5"
+              width="14"
+              height="14"
+              rx="2"
+              fill="currentColor"
+              stroke="none"
+            />
+            <g v-else stroke-linecap="round">
+              <rect x="9" y="2" width="6" height="13" rx="3" />
+              <path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-3 0h6" />
+            </g>
+          </svg>
+        </button>
         <UiButton
           type="submit"
           text="Отправить"
           class="send"
-          :disabled="disabled || sending || !draft.trim()"
+          :disabled="disabled || sending || (!draft.trim() && phase === 'idle')"
         />
       </form>
     </section>
@@ -84,10 +131,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import AssistantReply from './AssistantReply.vue'
 import AuthorLabel from './AuthorLabel.vue'
+import { useDictation, type Transcribe } from './useDictation'
 import type { Channel, RoomMessage, RoomSelection } from './useRoom'
 import { useSharedSelection } from './useSharedSelection'
 
@@ -105,6 +153,7 @@ const props = defineProps<{
   disabled: boolean
   busy?: boolean
   peerSelections?: ReadonlyMap<string, RoomSelection>
+  transcribe?: Transcribe
   savedSelections?: readonly RoomSelection[]
   markError?: string
   publishSelection?: (range: RoomSelection | null) => void
@@ -126,7 +175,71 @@ if (props.channel === 'ai')
     (range) => props.publishSelection?.(range),
     (range) => props.saveMark?.(range),
   )
+const input = ref<HTMLTextAreaElement | null>(null)
 const draft = ref('')
+let composing = false
+let afterComposition = ''
+
+function appendPhrase(text: string) {
+  if (composing) {
+    afterComposition += (afterComposition ? ' ' : '') + text
+    return
+  }
+  const field = input.value
+  if (!field) return
+  const separator = field.value && !/\s$/.test(field.value) ? ' ' : ''
+  const end = field.value.length
+  const { selectionStart, selectionEnd, selectionDirection } = field
+  field.setRangeText(separator + text, end, end, 'preserve')
+  if (field.selectionDirection !== selectionDirection)
+    field.setSelectionRange(selectionStart, selectionEnd, selectionDirection)
+  draft.value = field.value
+}
+
+function endComposition() {
+  composing = false
+  if (afterComposition) appendPhrase(afterComposition)
+  afterComposition = ''
+}
+
+const {
+  phase,
+  error: microphoneError,
+  start,
+  finish,
+  cancel,
+} = useDictation(
+  (audio, signal) => props.transcribe!(audio, signal),
+  appendPhrase,
+)
+const microphoneLabel = computed(
+  () =>
+    ({
+      idle: 'Начать диктовку',
+      starting: 'Отменить включение микрофона',
+      recording: 'Остановить диктовку',
+      finishing: 'Завершается распознавание',
+    })[phase.value],
+)
+
+function toggleMicrophone() {
+  sendError.value = ''
+  if (phase.value === 'idle') {
+    input.value?.focus({ preventScroll: true })
+    void start()
+  } else void finish()
+}
+
+watch(
+  () => props.connected,
+  (connected) => {
+    if (!connected && phase.value !== 'idle') {
+      cancel()
+      microphoneError.value = 'Связь с комнатой потеряна. Диктовка остановлена.'
+    }
+  },
+)
+
 const sending = ref(false)
 const sendError = ref('')
 let followLatest = true
@@ -170,17 +283,19 @@ watch(
 )
 
 async function submit() {
-  const original = draft.value
-  const text = original.trim()
-  if (props.disabled || sending.value || !text) return
-  if (text.length > 8000) {
-    sendError.value = 'Сообщение может содержать до 8000 символов.'
-    return
-  }
+  if (props.disabled || sending.value) return
   sending.value = true
   sendError.value = ''
   followLatest = true
   try {
+    if (phase.value !== 'idle' && !(await finish())) return
+    const original = draft.value
+    const text = original.trim()
+    if (!text || props.disabled) return
+    if (text.length > 8000) {
+      sendError.value = 'Сообщение может содержать до 8000 символов.'
+      return
+    }
     await props.send(props.channel, text)
     if (draft.value === original) draft.value = ''
   } catch (error) {
@@ -294,6 +409,30 @@ textarea {
 
   &::placeholder {
     color: var(--room-muted);
+  }
+}
+
+.microphone {
+  align-items: center;
+  background: var(--room-raised);
+  border: 1px solid var(--room-line);
+  border-radius: 8px;
+  color: var(--room-text);
+  cursor: pointer;
+  display: inline-flex;
+  flex: none;
+  height: 34px;
+  justify-content: center;
+  padding: 0;
+  width: 34px;
+
+  &.recording {
+    color: var(--room-error);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
 }
 

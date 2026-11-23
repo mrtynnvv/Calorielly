@@ -239,13 +239,17 @@ export function useRoom() {
     let response: Response
     try {
       response = await fetch(apiUrl + path, { ...init, credentials: 'omit' })
-    } catch {
+    } catch (error) {
+      if (init.signal?.aborted) throw error
       throw new Error('Не удалось связаться с сервером.')
     }
     if (!response.ok) {
+      if (response.status === 413 && path === '/transcriptions')
+        throw new Error('Аудиофрагмент слишком большой.')
       const body = await response.json().catch(() => null)
       throw new Error(body?.message || body?.error || 'Сервер отклонил запрос.')
     }
+    return response
   }
 
   return {
