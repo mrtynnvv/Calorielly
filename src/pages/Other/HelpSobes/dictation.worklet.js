@@ -5,6 +5,8 @@ class DictationProcessor extends AudioWorkletProcessor {
     this.frames = []
     this.length = 0
     this.voiced = 0
+    this.voicedRun = 0
+    this.longestRun = 0
     this.silence = 0
     this.active = true
     this.port.onmessage = ({ data }) => {
@@ -28,8 +30,11 @@ class DictationProcessor extends AudioWorkletProcessor {
     this.length += input.length
     if (audible) {
       this.voiced += input.length
+      this.voicedRun += input.length
+      this.longestRun = Math.max(this.longestRun, this.voicedRun)
       this.silence = 0
     } else if (this.voiced) {
+      this.voicedRun = 0
       this.silence += input.length
     } else {
       // Оставляем начало тихих слогов, но не отправляем тишину провайдеру.
@@ -47,7 +52,11 @@ class DictationProcessor extends AudioWorkletProcessor {
   }
 
   flush() {
-    if (this.voiced >= sampleRate * 0.03) {
+    // У отдельных щелчков клавиатуры нет протяжённого звука, как у короткого слова.
+    if (
+      this.voiced >= sampleRate * 0.1 &&
+      this.longestRun >= sampleRate * 0.045
+    ) {
       const phrase = new Float32Array(this.length)
       let offset = 0
       for (const frame of this.frames) {
@@ -58,6 +67,7 @@ class DictationProcessor extends AudioWorkletProcessor {
     }
     this.frames = []
     this.length = this.voiced = this.silence = 0
+    this.voicedRun = this.longestRun = 0
   }
 }
 
