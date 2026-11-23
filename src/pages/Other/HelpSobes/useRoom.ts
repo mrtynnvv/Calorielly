@@ -1,6 +1,7 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 
-export type Channel = 'ai' | 'chat'
+export type AiChannel = 'ai' | 'system'
+export type Channel = AiChannel | 'chat'
 export type RoomMessage = {
   id: number
   channel: Channel
@@ -19,7 +20,7 @@ export type SelectionPoint = { id: number; offset: number }
 export type RoomSelection = { start: SelectionPoint; end: SelectionPoint }
 type RoomMark = { id: number; author: string; range: RoomSelection }
 type MarkEdit =
-  | { type: 'mark' | 'erase-mark'; range: RoomSelection }
+  | { type: 'mark' | 'erase-mark'; range: RoomSelection; channel: AiChannel }
   | { type: 'clear-marks' }
 
 function before(a: SelectionPoint, b: SelectionPoint) {
@@ -61,15 +62,26 @@ type RoomEvent =
       context: RoomText
       dictationPrompt: RoomText
       busy: boolean
+      systemBusy?: boolean
       onlineAuthors?: string[]
       marks?: RoomMark[]
+      systemMarks?: RoomMark[]
       todos?: RoomTodo[]
     }
   | { type: 'delta'; id: number; text: string }
   | { type: 'presence'; onlineAuthors: string[] }
   | { type: 'todos'; todos: RoomTodo[] }
-  | { type: 'selection'; peer: string; range: RoomSelection | null }
-  | { type: 'marks'; marks: RoomMark[]; operationId?: string }
+  | {
+      type: 'selection' | 'system-selection'
+      peer: string
+      range: RoomSelection | null
+    }
+  | {
+      type: 'marks'
+      marks: RoomMark[]
+      systemMarks?: RoomMark[]
+      operationId?: string
+    }
   | { type: 'mark-error'; message: string; operationId?: string }
 
 function getAuthorId() {
@@ -107,27 +119,52 @@ export function useRoom() {
   const context = ref({ text: '', revision: 0 })
   const dictationPrompt = ref<RoomText>({ text: '', revision: -1 })
   const busy = ref(false)
+  const systemBusy = ref(false)
   const model = ref<string | null>(null)
   const models = ref<RoomModel[]>([])
   const peerSelections = shallowRef<ReadonlyMap<string, RoomSelection>>(
     new Map(),
   )
-  const marks = shallowRef<RoomMark[]>([])
-  const pendingMarks = shallowRef<(MarkEdit & { operationId: string })[]>([])
-  const mySelections = computed(() => {
-    let ranges = marks.value
-      .filter((mark) => mark.author === me)
-      .map((mark) => mark.range)
-    for (const edit of pendingMarks.value) {
-      if (edit.type === 'mark') ranges.push(edit.range)
-      else if (edit.type === 'erase-mark')
-        ranges = ranges.flatMap((range) => subtractMark(range, edit.range))
-      else ranges = []
-    }
-    return ranges
+  const systemPeerSelections = shallowRef<ReadonlyMap<string, RoomSelection>>(
+    new Map(),
+  )
+  const marks = shallowRef<Record<AiChannel, RoomMark[]>>({
+    ai: [],
+    system: [],
   })
+  const pendingMarks = shallowRef<(MarkEdit & { operationId: string })[]>([])
+  function selectionsFor(channel: AiChannel) {
+    const mine = computed(() => {
+      let ranges = marks.value[channel]
+        .filter((mark) => mark.author === me)
+        .map((mark) => mark.range)
+      for (const edit of pendingMarks.value) {
+        if (edit.type === 'clear-marks') ranges = []
+        else if (edit.channel === channel) {
+          if (edit.type === 'mark') ranges.push(edit.range)
+          else
+            ranges = ranges.flatMap((range) => subtractMark(range, edit.range))
+        }
+      }
+      return ranges
+    })
+    const saved = computed(() => [
+      ...marks.value[channel]
+        .filter((mark) => mark.author !== me)
+        .map((mark) => mark.range),
+      ...mine.value,
+    ])
+    return { mine, saved }
+  }
+  const selections = {
+    ai: selectionsFor('ai'),
+    system: selectionsFor('system'),
+  }
   const markError = ref('')
-  let localSelection: RoomSelection | null = null
+  const localSelections: Record<AiChannel, RoomSelection | null> = {
+    ai: null,
+    system: null,
+  }
   let retryDelay = 1000
   let timer: number | undefined
   let socket: WebSocket | undefined
@@ -137,10 +174,16 @@ export function useRoom() {
       socket.send(JSON.stringify(event))
   }
 
-  function publishSelection(range: RoomSelection | null) {
-    if (sameSelection(range, localSelection)) return
-    localSelection = range
-    sendSocket({ type: 'selection', range })
+  function publishSelection(
+    range: RoomSelection | null,
+    channel: AiChannel = 'ai',
+  ) {
+    if (sameSelection(range, localSelections[channel])) return
+    localSelections[channel] = range
+    sendSocket({
+      type: channel === 'ai' ? 'selection' : 'system-selection',
+      range,
+    })
   }
 
   function applyMark(edit: MarkEdit) {
@@ -151,8 +194,14 @@ export function useRoom() {
   }
 
   function toggleMark(range: RoomSelection) {
-    const erase = mySelections.value.some((saved) => overlaps(saved, range))
-    applyMark({ type: erase ? 'erase-mark' : 'mark', range })
+    const channel = messages.value.find(
+      ({ id }) => id === range.start.id,
+    )?.channel
+    if (channel !== 'ai' && channel !== 'system') return false
+    const erase = selections[channel].mine.value.some((saved) =>
+      overlaps(saved, range),
+    )
+    applyMark({ type: erase ? 'erase-mark' : 'mark', range, channel })
     return erase
   }
 
@@ -166,6 +215,7 @@ export function useRoom() {
   function clearMyMarks() {
     if (!connected.value) return
     publishSelection(null)
+    publishSelection(null, 'system')
     applyMark({ type: 'clear-marks' })
   }
 
@@ -199,12 +249,13 @@ export function useRoom() {
         context.value = event.context
         if (event.dictationPrompt) dictationPrompt.value = event.dictationPrompt
         busy.value = event.busy
+        systemBusy.value = event.systemBusy ?? false
         onlineAuthors.value = event.onlineAuthors
           ? new Set(event.onlineAuthors)
           : null
         const reconnecting = !connected.value
         connected.value = true
-        marks.value = event.marks ?? []
+        marks.value = { ai: event.marks ?? [], system: event.systemMarks ?? [] }
         if (pendingMarks.value.length) {
           const ids = new Set(event.messages.map((message) => message.id))
           pendingMarks.value = pendingMarks.value.filter(
@@ -215,8 +266,13 @@ export function useRoom() {
           if (reconnecting)
             for (const edit of pendingMarks.value) sendSocket(edit)
         }
-        if (reconnecting && localSelection)
-          sendSocket({ type: 'selection', range: localSelection })
+        if (reconnecting && localSelections.ai)
+          sendSocket({ type: 'selection', range: localSelections.ai })
+        if (reconnecting && localSelections.system)
+          sendSocket({
+            type: 'system-selection',
+            range: localSelections.system,
+          })
         status.value = ''
         retryDelay = 1000
       } else if (event.type === 'delta') {
@@ -227,16 +283,21 @@ export function useRoom() {
       } else if (event.type === 'todos') {
         todos.value = event.todos
       } else if (event.type === 'marks') {
-        marks.value = event.marks
+        marks.value = { ai: event.marks, system: event.systemMarks ?? [] }
         acknowledgeMark(event.operationId)
       } else if (event.type === 'mark-error') {
         acknowledgeMark(event.operationId)
         markError.value = event.message
-      } else if (event.type === 'selection') {
-        const peers = new Map(peerSelections.value)
+      } else if (
+        event.type === 'selection' ||
+        event.type === 'system-selection'
+      ) {
+        const currentPeers =
+          event.type === 'selection' ? peerSelections : systemPeerSelections
+        const peers = new Map(currentPeers.value)
         if (event.range) peers.set(event.peer, event.range)
         else peers.delete(event.peer)
-        peerSelections.value = peers
+        currentPeers.value = peers
       }
     }
     current.onclose = () => {
@@ -256,6 +317,7 @@ export function useRoom() {
     connected.value = false
     onlineAuthors.value = null
     peerSelections.value = new Map()
+    systemPeerSelections.value = new Map()
     status.value = 'Связь прервалась. Переподключение…'
   }
 
@@ -303,24 +365,31 @@ export function useRoom() {
     dictationPrompt,
     todos,
     busy,
+    systemBusy,
     connected,
     onlineAuthors,
     status,
     request,
     peerSelections,
+    systemPeerSelections,
     publishSelection,
-    savedSelections: computed(() => [
-      ...marks.value
-        .filter((mark) => mark.author !== me)
-        .map((mark) => mark.range),
-      ...mySelections.value,
-    ]),
-    hasMyMarks: computed(() => mySelections.value.length > 0),
+    publishSystemSelection: (range: RoomSelection | null) =>
+      publishSelection(range, 'system'),
+    savedSelections: selections.ai.saved,
+    systemSavedSelections: selections.system.saved,
+    hasMyMarks: computed(
+      () =>
+        selections.ai.mine.value.length > 0 ||
+        selections.system.mine.value.length > 0,
+    ),
     markError,
     toggleMark,
     clearMyMarks,
     aiMessages: computed(() =>
       messages.value.filter((item) => item.channel === 'ai'),
+    ),
+    systemMessages: computed(() =>
+      messages.value.filter((item) => item.channel === 'system'),
     ),
     chatMessages: computed(() =>
       messages.value.filter((item) => item.channel === 'chat'),

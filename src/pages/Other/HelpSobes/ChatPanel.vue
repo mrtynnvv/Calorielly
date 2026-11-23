@@ -43,7 +43,7 @@
             <AssistantReply
               v-if="message.text"
               :data-selection-message="
-                channel === 'ai' ? message.id : undefined
+                channel !== 'chat' ? message.id : undefined
               "
               :text="message.text"
               :incomplete="
@@ -55,7 +55,9 @@
           <p
             v-else-if="message.text"
             class="body"
-            :data-selection-message="channel === 'ai' ? message.id : undefined"
+            :data-selection-message="
+              channel !== 'chat' ? message.id : undefined
+            "
           >
             {{ message.text }}
           </p>
@@ -80,11 +82,11 @@
         </div>
       </div>
       <p
-        v-if="sendError || microphoneError || markError"
+        v-if="sendError || dictationError || markError"
         class="error"
         role="alert"
       >
-        {{ sendError || microphoneError || markError }}
+        {{ sendError || dictationError || markError }}
       </p>
       <div
         v-if="images.length || preparing"
@@ -125,19 +127,19 @@
           @compositionend="endComposition"
         />
         <button
-          v-if="channel === 'ai' && transcribe"
+          v-if="channel !== 'chat' && transcribe"
           type="button"
           class="microphone"
           :class="{ recording: phase === 'recording' }"
-          :aria-label="microphoneLabel"
-          :title="microphoneLabel"
+          :aria-label="dictationLabel"
+          :title="dictationLabel"
           :aria-pressed="phase === 'recording' || phase === 'starting'"
           :aria-busy="phase === 'starting' || phase === 'finishing'"
           :disabled="
             sending || phase === 'finishing' || (!connected && phase === 'idle')
           "
           @mousedown.prevent
-          @click="toggleMicrophone"
+          @click="toggleRecording"
         >
           <svg
             aria-hidden="true"
@@ -158,6 +160,14 @@
               fill="currentColor"
               stroke="none"
             />
+            <g
+              v-else-if="channel === 'system'"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M3 9h4l5-4v14l-5-4H3z" />
+              <path d="M16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" />
+            </g>
             <g v-else stroke-linecap="round">
               <rect x="9" y="2" width="6" height="13" rx="3" />
               <path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-3 0h6" />
@@ -202,6 +212,7 @@ const props = defineProps<{
   connected: boolean
   onlineAuthors: ReadonlySet<string> | null
   disabled: boolean
+  collapsed?: boolean
   busy?: boolean
   peerSelections?: ReadonlyMap<string, RoomSelection>
   transcribe?: Transcribe
@@ -213,7 +224,7 @@ const props = defineProps<{
 }>()
 
 const log = ref<HTMLElement | null>(null)
-if (props.channel === 'ai')
+if (props.channel !== 'chat')
   useSharedSelection(
     log,
     () => [
@@ -225,6 +236,7 @@ if (props.channel === 'ai')
     () => props.savedSelections,
     (range) => props.publishSelection?.(range),
     (range) => props.toggleMark?.(range),
+    props.channel,
   )
 const input = ref<HTMLTextAreaElement | null>(null)
 const draft = ref('')
@@ -255,25 +267,35 @@ function endComposition() {
 
 const {
   phase,
-  error: microphoneError,
+  error: dictationError,
   start,
   finish,
   cancel,
 } = useDictation(
   (audio, signal) => props.transcribe!(audio, signal),
   appendPhrase,
+  props.channel === 'system' ? 'display' : 'microphone',
 )
-const microphoneLabel = computed(
+const dictationLabel = computed(
   () =>
     ({
-      idle: 'Начать диктовку',
-      starting: 'Отменить включение микрофона',
-      recording: 'Остановить диктовку',
+      idle:
+        props.channel === 'system'
+          ? 'Распознавать звук компьютера'
+          : 'Начать диктовку',
+      starting:
+        props.channel === 'system'
+          ? 'Отменить выбор источника звука'
+          : 'Отменить включение микрофона',
+      recording:
+        props.channel === 'system'
+          ? 'Остановить распознавание звука компьютера'
+          : 'Остановить диктовку',
       finishing: 'Завершается распознавание',
     })[phase.value],
 )
 
-function toggleMicrophone() {
+function toggleRecording() {
   sendError.value = ''
   if (phase.value === 'idle') {
     input.value?.focus({ preventScroll: true })
@@ -286,8 +308,15 @@ watch(
   (connected) => {
     if (!connected && phase.value !== 'idle') {
       cancel()
-      microphoneError.value = 'Связь с комнатой потеряна. Диктовка остановлена.'
+      dictationError.value = 'Связь с комнатой потеряна. Диктовка остановлена.'
     }
+  },
+)
+
+watch(
+  () => props.collapsed,
+  (collapsed) => {
+    if (collapsed && phase.value !== 'idle') void finish()
   },
 )
 
@@ -378,7 +407,9 @@ function handleEnter(event: KeyboardEvent) {
 
 <style>
 ::highlight(sobes-peer-selection),
-::highlight(sobes-saved-marks) {
+::highlight(sobes-saved-marks),
+::highlight(sobes-system-peer-selection),
+::highlight(sobes-system-saved-marks) {
   background-color: var(--room-highlight, #ffe294);
   color: #242424;
 }

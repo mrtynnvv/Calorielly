@@ -2,28 +2,34 @@
   <main class="room" :data-theme="theme" aria-label="Комната на двоих">
     <p v-if="status" class="connection" role="status">{{ status }}</p>
     <RoomSplit>
-      <template #ai>
+      <template
+        v-for="panel in panels"
+        :key="panel.channel"
+        #[panel.channel]="{ collapsed, showSettings }"
+      >
         <ChatPanel
-          id="sobes-ai-panel"
-          channel="ai"
-          title="Чат с ИИ"
-          placeholder="Вопрос для ИИ"
+          :channel="panel.channel"
+          :title="panel.title"
+          :placeholder="panel.placeholder"
+          :collapsed="collapsed"
           :me="me"
           :connected="connected"
           :online-authors="onlineAuthors"
-          :messages="aiMessages"
+          :messages="panel.messages"
           :image-base-url="imageBaseUrl"
-          :busy="busy"
-          :disabled="aiLocked"
+          :busy="panel.busy"
+          :disabled="panel.channel === 'chat' ? !connected : aiLocked"
           :send="sendMessage"
-          :transcribe="transcribeDictation"
-          :peer-selections="peerSelections"
-          :saved-selections="savedSelections"
-          :mark-error="markError"
+          :transcribe="
+            panel.channel === 'chat' ? undefined : transcribeDictation
+          "
+          :peer-selections="panel.peers"
+          :saved-selections="panel.marks"
+          :mark-error="panel.channel === 'chat' ? undefined : markError"
           :toggle-mark="toggleMark"
-          :publish-selection="publishSelection"
+          :publish-selection="panel.publish"
         >
-          <template #actions>
+          <template v-if="showSettings" #actions>
             <button
               class="action"
               type="button"
@@ -36,18 +42,6 @@
           </template>
         </ChatPanel>
       </template>
-      <ChatPanel
-        channel="chat"
-        title="Чат вдвоём"
-        placeholder="Сообщение другу"
-        :me="me"
-        :connected="connected"
-        :online-authors="onlineAuthors"
-        :messages="chatMessages"
-        :image-base-url="imageBaseUrl"
-        :disabled="!connected"
-        :send="sendMessage"
-      />
     </RoomSplit>
     <dialog
       id="sobes-settings"
@@ -175,10 +169,12 @@
           <button
             class="action reset"
             type="button"
-            :disabled="!canReset"
-            @click="resetHistory"
+            v-for="action in historyActions"
+            :key="action.channel"
+            :disabled="aiLocked || !action.count"
+            @click="resetHistory(action)"
           >
-            Сбросить историю ИИ
+            Сбросить историю {{ action.label }}
           </button>
           <p v-if="error || markError" class="error" role="alert">
             {{ error || markError }}
@@ -242,6 +238,11 @@ const {
   connected,
   onlineAuthors,
   status,
+  systemMessages,
+  systemBusy,
+  systemPeerSelections,
+  systemSavedSelections,
+  publishSystemSelection,
   aiMessages,
   chatMessages,
   peerSelections,
@@ -316,7 +317,52 @@ const settingsBusy = computed(
   () => !!saving.value || resetting.value || !!pendingModel.value,
 )
 const aiLocked = computed(() => !connected.value || settingsBusy.value)
-const canReset = computed(() => !aiLocked.value && aiMessages.value.length > 0)
+const panels = computed(
+  () =>
+    [
+      {
+        channel: 'system',
+        title: 'Звук компьютера',
+        placeholder: 'Вопрос по звуку компьютера',
+        messages: systemMessages.value,
+        busy: systemBusy.value,
+        peers: systemPeerSelections.value,
+        marks: systemSavedSelections.value,
+        publish: publishSystemSelection,
+      },
+      {
+        channel: 'ai',
+        title: 'Чат с ИИ',
+        placeholder: 'Вопрос для ИИ',
+        messages: aiMessages.value,
+        busy: busy.value,
+        peers: peerSelections.value,
+        marks: savedSelections.value,
+        publish: publishSelection,
+      },
+      {
+        channel: 'chat',
+        title: 'Чат вдвоём',
+        placeholder: 'Сообщение другу',
+        messages: chatMessages.value,
+        busy: false,
+        peers: undefined,
+        marks: undefined,
+        publish: undefined,
+      },
+    ] as const,
+)
+const historyActions = computed(
+  () =>
+    [
+      { channel: 'ai', label: 'ИИ', count: aiMessages.value.length },
+      {
+        channel: 'system',
+        label: 'чата «Звук компьютера»',
+        count: systemMessages.value.length,
+      },
+    ] as const,
+)
 const todoDraft = ref('')
 const addingTodo = ref(false)
 const deletingTodos = ref(new Set<string>())
@@ -479,18 +525,19 @@ async function sendMessage(channel: Channel, text: string, images: File[]) {
   })
 }
 
-async function resetHistory() {
+async function resetHistory(action: (typeof historyActions.value)[number]) {
   if (
-    !canReset.value ||
+    aiLocked.value ||
+    !action.count ||
     !window.confirm(
-      'Сбросить общую историю чата с ИИ для вас обоих? Базовый контекст сохранится.',
+      `Сбросить историю ${action.label} для вас обоих? Базовый контекст сохранится.`,
     )
   )
     return
   resetting.value = true
   error.value = ''
   try {
-    await request('/history/ai', { method: 'DELETE' })
+    await request(`/history/${action.channel}`, { method: 'DELETE' })
   } catch (cause) {
     error.value =
       cause instanceof Error ? cause.message : 'Не удалось сбросить историю.'

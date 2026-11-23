@@ -8,8 +8,6 @@ import {
 } from './useRoom'
 
 const messageSelector = '[data-selection-message]'
-const highlightName = 'sobes-peer-selection'
-const savedHighlightName = 'sobes-saved-marks'
 
 function messageBodies(log: HTMLElement) {
   return log.querySelectorAll<HTMLElement>(messageSelector)
@@ -113,7 +111,11 @@ export function useSharedSelection(
   marks: () => readonly RoomSelection[] | undefined,
   publish: (range: RoomSelection | null) => void,
   toggle: (range: RoomSelection) => boolean | undefined,
+  channel: 'ai' | 'system',
 ) {
+  const prefix = channel === 'system' ? 'sobes-system' : 'sobes'
+  const highlightName = prefix + '-peer-selection'
+  const savedHighlightName = prefix + '-saved-marks'
   let frame = 0
   let completed: RoomSelection | null = null
   let pointer: number | null = null
