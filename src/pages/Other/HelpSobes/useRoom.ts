@@ -11,6 +11,7 @@ export type RoomMessage = {
 }
 
 type RoomModel = { id: string; label: string }
+type RoomTodo = { id: string; text: string }
 
 export type SelectionPoint = { id: number; offset: number }
 export type RoomSelection = { start: SelectionPoint; end: SelectionPoint }
@@ -43,9 +44,11 @@ type RoomEvent =
       busy: boolean
       onlineAuthors?: string[]
       marks?: RoomMark[]
+      todos?: RoomTodo[]
     }
   | { type: 'delta'; id: number; text: string }
   | { type: 'presence'; onlineAuthors: string[] }
+  | { type: 'todos'; todos: RoomTodo[] }
   | { type: 'selection'; peer: string; range: RoomSelection | null }
   | { type: 'marks'; marks: RoomMark[]; operationId?: string }
   | { type: 'mark-error'; message: string; operationId?: string }
@@ -81,6 +84,7 @@ export function useRoom() {
   const onlineAuthors = shallowRef<ReadonlySet<string> | null>(null)
   const status = ref('Подключение…')
   const messages = ref<RoomMessage[]>([])
+  const todos = shallowRef<RoomTodo[]>([])
   const context = ref({ text: '', revision: 0 })
   const busy = ref(false)
   const model = ref<string | null>(null)
@@ -184,6 +188,7 @@ export function useRoom() {
       const event: RoomEvent = JSON.parse(data)
       if (event.type === 'state') {
         messages.value = event.messages
+        todos.value = event.todos ?? []
         model.value = event.model ?? null
         models.value = event.models ?? []
         context.value = event.context
@@ -211,6 +216,8 @@ export function useRoom() {
         if (message && !message.interrupted) message.text += event.text
       } else if (event.type === 'presence') {
         onlineAuthors.value = new Set(event.onlineAuthors)
+      } else if (event.type === 'todos') {
+        todos.value = event.todos
       } else if (event.type === 'marks') {
         marks.value = event.marks
         acknowledgeMark(event.operationId)
@@ -278,6 +285,7 @@ export function useRoom() {
     model,
     models,
     context,
+    todos,
     busy,
     connected,
     onlineAuthors,

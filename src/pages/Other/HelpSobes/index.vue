@@ -172,6 +172,40 @@
             {{ error || markError }}
           </p>
         </section>
+        <section class="settings-section" aria-labelledby="sobes-todos-title">
+          <h3 id="sobes-todos-title" class="t-title">Что улучшить</h3>
+          <form class="editor todo-form" @submit.prevent="addTodo">
+            <input
+              v-model="todoDraft"
+              type="text"
+              placeholder="Новый пункт"
+              aria-label="Новый пункт"
+              maxlength="500"
+            />
+            <button
+              class="action primary"
+              type="submit"
+              :disabled="!connected || addingTodo || !todoDraft.trim()"
+            >
+              Добавить
+            </button>
+          </form>
+          <ul v-if="todos.length" class="todo-list">
+            <li v-for="todo in todos" :key="todo.id" class="todo-row">
+              <span>{{ todo.text }}</span>
+              <button
+                type="button"
+                class="action"
+                :aria-label="`Удалить пункт «${todo.text}»`"
+                :disabled="!connected || deletingTodos.has(todo.id)"
+                @click="deleteTodo(todo.id)"
+              >
+                Удалить
+              </button>
+            </li>
+          </ul>
+          <p v-if="todoError" class="error" role="alert">{{ todoError }}</p>
+        </section>
       </div>
     </dialog>
   </main>
@@ -187,6 +221,7 @@ import { type Channel, useRoom } from './useRoom'
 const {
   me,
   context,
+  todos,
   model,
   models,
   busy,
@@ -256,6 +291,49 @@ const canReset = computed(() => !aiLocked.value && aiMessages.value.length > 0)
 const conflicted = computed(
   () => !saving.value && draftRevision.value !== context.value.revision,
 )
+const todoDraft = ref('')
+const addingTodo = ref(false)
+const deletingTodos = ref(new Set<string>())
+const todoError = ref('')
+// Повторная отправка того же черновика после обрыва связи использует прежний ID.
+const todoSubmission = computed(() => ({
+  id: crypto.randomUUID(),
+  text: todoDraft.value.trim(),
+}))
+
+async function addTodo() {
+  const todo = todoSubmission.value
+  if (!connected.value || addingTodo.value || !todo.text) return
+  addingTodo.value = true
+  todoError.value = ''
+  try {
+    await request('/todos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(todo),
+    })
+    if (todoDraft.value.trim() === todo.text) todoDraft.value = ''
+  } catch (cause) {
+    todoError.value =
+      cause instanceof Error ? cause.message : 'Не удалось добавить пункт.'
+  } finally {
+    addingTodo.value = false
+  }
+}
+
+async function deleteTodo(id: string) {
+  if (!connected.value || deletingTodos.value.has(id)) return
+  deletingTodos.value.add(id)
+  todoError.value = ''
+  try {
+    await request(`/todos/${id}`, { method: 'DELETE' })
+  } catch (cause) {
+    todoError.value =
+      cause instanceof Error ? cause.message : 'Не удалось удалить пункт.'
+  } finally {
+    deletingTodos.value.delete(id)
+  }
+}
 
 function loadContext() {
   draft.value = context.value.text
@@ -521,17 +599,44 @@ dialog {
   font-size: $size-comment;
   gap: 6px;
 
-  textarea {
+  textarea,
+  input {
     background: var(--room-input);
     border: 1px solid var(--room-field-border);
     border-radius: 8px;
     color: var(--room-text);
     font-size: 16px;
-    max-height: 40dvh;
     min-width: 0;
     padding: 8px 10px;
+  }
+
+  textarea {
+    max-height: 40dvh;
     resize: vertical;
   }
+}
+
+.todo-list {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.todo-form,
+.todo-row {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.todo-row {
+  align-items: center;
+  border: 1px solid var(--room-line);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+  padding: 4px 6px 4px 10px;
 }
 
 .action {
