@@ -1,5 +1,5 @@
 <template>
-  <main class="room" aria-label="Комната на двоих">
+  <main class="room" :data-theme="theme" aria-label="Комната на двоих">
     <p v-if="status" class="connection" role="status">{{ status }}</p>
     <div class="columns">
       <ChatPanel
@@ -7,6 +7,8 @@
         title="Чат с ИИ"
         placeholder="Вопрос для ИИ"
         :me="me"
+        :connected="connected"
+        :online-authors="onlineAuthors"
         :messages="aiMessages"
         :busy="busy"
         :disabled="aiLocked"
@@ -31,6 +33,8 @@
         title="Чат вдвоём"
         placeholder="Сообщение другу"
         :me="me"
+        :connected="connected"
+        :online-authors="onlineAuthors"
         :messages="chatMessages"
         :disabled="!connected"
         :send="sendMessage"
@@ -45,7 +49,7 @@
     >
       <div class="settings-content">
         <header class="settings-header">
-          <h2 id="sobes-settings-title" class="t-title">Параметры чата с ИИ</h2>
+          <h2 id="sobes-settings-title" class="t-title">Параметры комнаты</h2>
           <button
             class="action close"
             type="button"
@@ -53,84 +57,101 @@
             :disabled="settingsBusy"
             @click="closeSettings"
           >
-            <img src="@/assets/close-gray.svg" alt="" width="16" height="16" />
+            <span aria-hidden="true">×</span>
           </button>
         </header>
-        <p v-if="status" class="connection" role="status">{{ status }}</p>
-        <fieldset
-          v-if="models.length"
-          class="models"
-          :disabled="!connected || saving || resetting"
-          :aria-busy="!!pendingModel"
-        >
-          <legend class="t-title">Модель</legend>
-          <label v-for="option in models" :key="option.id" class="model-option">
-            <input
-              type="radio"
-              name="sobes-model"
-              :value="option.id"
-              :disabled="pendingModel !== null && pendingModel !== option.id"
-              :checked="(pendingModel ?? model) === option.id"
-              @change="changeModel(option.id)"
-            />
-            {{ option.label }}
-          </label>
-        </fieldset>
-        <form class="editor" @submit.prevent="saveContext">
-          <label class="t-title" for="sobes-context"
-            >Базовый контекст для ИИ</label
+        <section class="settings-section" aria-labelledby="sobes-local-title">
+          <h3 id="sobes-local-title" class="t-title">Личные настройки</h3>
+          <fieldset class="options theme-options">
+            <legend>Тема</legend>
+            <label v-for="option in themes" :key="option.value" class="option">
+              <input
+                type="radio"
+                name="sobes-theme"
+                :value="option.value"
+                :checked="theme === option.value"
+                @change="setTheme(option.value)"
+              />
+              {{ option.label }}
+            </label>
+          </fieldset>
+        </section>
+        <section class="settings-section" aria-labelledby="sobes-shared-title">
+          <h3 id="sobes-shared-title" class="t-title">Общие настройки</h3>
+          <p v-if="status" class="connection" role="status">{{ status }}</p>
+          <fieldset
+            v-if="models.length"
+            class="options"
+            :disabled="!connected || saving || resetting"
+            :aria-busy="!!pendingModel"
           >
-          <textarea
-            id="sobes-context"
-            v-model="draft"
-            rows="6"
-            maxlength="16000"
-            :disabled="saving"
-          />
-          <p v-if="conflicted" role="status">
-            Контекст уже изменился. Можно загрузить сохранённый текст или
-            записать свой поверх него.
-          </p>
-          <div class="actions">
-            <button
-              type="submit"
-              class="action primary"
-              :disabled="aiLocked || draft === context.text"
-            >
-              {{
-                saving
-                  ? 'Сохранение…'
-                  : conflicted
-                    ? 'Сохранить мою версию'
-                    : 'Сохранить контекст'
-              }}
-            </button>
-            <button
-              v-if="conflicted"
-              type="button"
-              class="action"
-              @click="loadContext"
-            >
-              Загрузить сохранённый текст
-            </button>
-          </div>
-        </form>
-        <button
-          class="action reset"
-          type="button"
-          :disabled="!canReset"
-          @click="resetHistory"
-        >
-          Сбросить историю ИИ
-        </button>
-        <p v-if="error" class="error" role="alert">{{ error }}</p>
+            <legend>Модель</legend>
+            <label v-for="option in models" :key="option.id" class="option">
+              <input
+                type="radio"
+                name="sobes-model"
+                :value="option.id"
+                :disabled="pendingModel !== null && pendingModel !== option.id"
+                :checked="(pendingModel ?? model) === option.id"
+                @change="changeModel(option.id)"
+              />
+              {{ option.label }}
+            </label>
+          </fieldset>
+          <form class="editor" @submit.prevent="saveContext">
+            <label for="sobes-context">Базовый контекст для ИИ</label>
+            <textarea
+              id="sobes-context"
+              v-model="draft"
+              rows="6"
+              maxlength="16000"
+              :disabled="saving"
+            />
+            <p v-if="conflicted" role="status">
+              Контекст уже изменился. Можно загрузить сохранённый текст или
+              записать свой поверх него.
+            </p>
+            <div class="actions">
+              <button
+                type="submit"
+                class="action primary"
+                :disabled="aiLocked || draft === context.text"
+              >
+                {{
+                  saving
+                    ? 'Сохранение…'
+                    : conflicted
+                      ? 'Сохранить мою версию'
+                      : 'Сохранить контекст'
+                }}
+              </button>
+              <button
+                v-if="conflicted"
+                type="button"
+                class="action"
+                @click="loadContext"
+              >
+                Загрузить сохранённый текст
+              </button>
+            </div>
+          </form>
+          <button
+            class="action reset"
+            type="button"
+            :disabled="!canReset"
+            @click="resetHistory"
+          >
+            Сбросить историю ИИ
+          </button>
+          <p v-if="error" class="error" role="alert">{{ error }}</p>
+        </section>
       </div>
     </dialog>
   </main>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import ChatPanel from './ChatPanel.vue'
 import { type Channel, useRoom } from './useRoom'
@@ -142,6 +163,7 @@ const {
   models,
   busy,
   connected,
+  onlineAuthors,
   status,
   aiMessages,
   chatMessages,
@@ -149,6 +171,30 @@ const {
   publishSelection,
   request,
 } = useRoom()
+const themes = [
+  { value: 'dark', label: 'Тёмная' },
+  { value: 'light', label: 'Светлая' },
+] as const
+const themeKey = 'help-sobes.theme'
+const theme = ref<'light' | 'dark'>(
+  localStorage.getItem(themeKey) === 'light' ? 'light' : 'dark',
+)
+function setTheme(value: 'light' | 'dark') {
+  theme.value = value
+  localStorage.setItem(themeKey, value)
+}
+
+function syncTheme(event: StorageEvent) {
+  if (
+    event.storageArea === localStorage &&
+    (event.key === themeKey || event.key === null)
+  )
+    theme.value = event.newValue === 'light' ? 'light' : 'dark'
+}
+
+onMounted(() => window.addEventListener('storage', syncTheme))
+onUnmounted(() => window.removeEventListener('storage', syncTheme))
+
 const settings = ref<HTMLDialogElement | null>(null)
 const draft = ref('')
 const draftRevision = ref(0)
@@ -263,15 +309,65 @@ async function resetHistory() {
 
 <style scoped lang="scss">
 .room {
+  --room-page: #191a1c;
+  --room-surface: #222325;
+  --room-raised: #2e3033;
+  --room-own: #323c48;
+  --room-input: #282a2d;
+  --room-code: #1b1d20;
+  --room-text: #ececee;
+  --room-muted: #b6b9c0;
+  --room-line: #414348;
+  --room-field-border: #6b6e76;
+  --room-accent: #a4cafa;
+  --room-on-accent: #17283d;
+  --room-error: #ffa8a8;
+  --room-online: #6bcd98;
+  --room-offline: #ff9393;
+  --room-highlight: #e7c37d;
+
+  background: var(--room-page);
+  color: var(--room-text);
+  color-scheme: dark;
   display: flex;
   flex-direction: column;
   gap: 4px;
   height: 100dvh;
   padding: 4px;
+
+  &[data-theme='light'] {
+    --room-page: #eeeef0;
+    --room-surface: #fff;
+    --room-raised: #{$palette-bg};
+    --room-own: #e8f3ff;
+    --room-input: #fff;
+    --room-code: #fff;
+    --room-text: #{$color-main};
+    --room-muted: #{$color-comment};
+    --room-line: #d9d9d9;
+    --room-field-border: #818a95;
+    --room-accent: #1664ad;
+    --room-on-accent: #fff;
+    --room-error: #a32121;
+    --room-online: #197242;
+    --room-offline: #b02d3b;
+    --room-highlight: #ffe294;
+
+    color-scheme: light;
+  }
+
+  .t-title {
+    color: var(--room-text);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--room-accent);
+    outline-offset: 1px;
+  }
 }
 
 .connection {
-  color: $color-comment;
+  color: var(--room-muted);
   font-size: $size-comment;
 }
 
@@ -284,9 +380,10 @@ async function resetHistory() {
 }
 
 dialog {
-  border: 1px solid #d9d9d9;
+  background: var(--room-surface);
+  border: 1px solid var(--room-line);
   border-radius: 12px;
-  color: $color-main;
+  color: var(--room-text);
   margin: auto;
   max-height: calc(100dvh - 16px);
   overscroll-behavior: contain;
@@ -300,7 +397,7 @@ dialog {
 
 .settings-content {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   padding: 16px;
 }
 
@@ -319,7 +416,14 @@ dialog {
   flex-wrap: wrap;
 }
 
-.models {
+.settings-section {
+  border-top: 1px solid var(--room-line);
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.options {
   border: 0;
   display: grid;
   gap: 4px;
@@ -327,13 +431,19 @@ dialog {
   padding: 0;
 
   legend {
-    margin-bottom: 6px;
+    color: var(--room-muted);
+    font-size: $size-comment;
+    margin-bottom: 4px;
   }
 }
 
-.model-option {
+.theme-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.option {
   align-items: center;
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--room-line);
   border-radius: 8px;
   cursor: pointer;
   display: flex;
@@ -343,25 +453,26 @@ dialog {
   padding: 4px 10px;
 
   input {
-    accent-color: #1664ad;
+    accent-color: var(--room-accent);
   }
 
   &:has(:checked) {
-    background: #e8f3ff;
-    border-color: #1664ad;
+    background: var(--room-own);
+    border-color: var(--room-accent);
   }
 }
 
 .editor {
-  color: $color-comment;
+  color: var(--room-muted);
   display: grid;
   font-size: $size-comment;
   gap: 6px;
 
   textarea {
-    border: 1px solid #aeb4bc;
+    background: var(--room-input);
+    border: 1px solid var(--room-field-border);
     border-radius: 8px;
-    color: $color-main;
+    color: var(--room-text);
     font-size: 16px;
     max-height: 40dvh;
     min-width: 0;
@@ -371,10 +482,10 @@ dialog {
 }
 
 .action {
-  background: $palette-bg;
+  background: var(--room-raised);
   border: none;
   border-radius: 6px;
-  color: $color-main;
+  color: var(--room-text);
   cursor: pointer;
   font-size: $size-comment;
   min-height: 28px;
@@ -389,13 +500,15 @@ dialog {
 .close {
   align-items: center;
   display: inline-flex;
+  font-size: 20px;
   justify-content: center;
+  line-height: 1;
   min-width: 32px;
 }
 
 .primary {
-  background: #1664ad;
-  color: #fff;
+  background: var(--room-accent);
+  color: var(--room-on-accent);
 }
 
 .reset {
@@ -403,7 +516,7 @@ dialog {
 }
 
 .error {
-  color: #a32121;
+  color: var(--room-error);
   font-size: $size-comment;
 }
 

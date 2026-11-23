@@ -6,6 +6,7 @@ export type RoomMessage = {
   channel: Channel
   author: string
   text: string
+  createdAt?: string | null
   interrupted?: boolean
 }
 
@@ -22,8 +23,10 @@ type RoomEvent =
       models: RoomModel[]
       context: { text: string; revision: number }
       busy: boolean
+      onlineAuthors?: string[]
     }
   | { type: 'delta'; id: number; text: string }
+  | { type: 'presence'; onlineAuthors: string[] }
   | { type: 'selection'; peer: string; range: RoomSelection | null }
 
 function getAuthorId() {
@@ -54,6 +57,7 @@ export function useRoom() {
   const apiUrl = getApiUrl()
   const me = getAuthorId()
   const connected = ref(false)
+  const onlineAuthors = shallowRef<ReadonlySet<string> | null>(null)
   const status = ref('Подключение…')
   const messages = ref<RoomMessage[]>([])
   const context = ref({ text: '', revision: 0 })
@@ -64,7 +68,6 @@ export function useRoom() {
     new Map(),
   )
   let localSelection: RoomSelection | null = null
-  let disposed = false
   let retryDelay = 1000
   let timer: number | undefined
   let socket: WebSocket | undefined
@@ -87,15 +90,26 @@ export function useRoom() {
   }
 
   function connect() {
+    window.clearTimeout(timer)
     if (!apiUrl) {
       status.value = 'Адрес сервера комнаты не настроен.'
       return
     }
+    if (navigator.onLine === false) {
+      disconnect()
+      return
+    }
+    if (socket) return
     const wsUrl = new URL(apiUrl + '/room')
     wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:'
-    socket = new WebSocket(wsUrl)
-    socket.onmessage = ({ data }) => {
-      if (disposed) return
+    const current = new WebSocket(wsUrl)
+    socket = current
+    current.onopen = () => {
+      if (socket === current)
+        current.send(JSON.stringify({ type: 'join', author: me }))
+    }
+    current.onmessage = ({ data }) => {
+      if (socket !== current) return
       const event: RoomEvent = JSON.parse(data)
       if (event.type === 'state') {
         messages.value = event.messages
@@ -103,6 +117,9 @@ export function useRoom() {
         models.value = event.models ?? []
         context.value = event.context
         busy.value = event.busy
+        onlineAuthors.value = event.onlineAuthors
+          ? new Set(event.onlineAuthors)
+          : null
         const reconnecting = !connected.value
         connected.value = true
         if (reconnecting && localSelection) sendSelection()
@@ -111,6 +128,8 @@ export function useRoom() {
       } else if (event.type === 'delta') {
         const message = messages.value.find((item) => item.id === event.id)
         if (message && !message.interrupted) message.text += event.text
+      } else if (event.type === 'presence') {
+        onlineAuthors.value = new Set(event.onlineAuthors)
       } else if (event.type === 'selection') {
         const peers = new Map(peerSelections.value)
         if (event.range) peers.set(event.peer, event.range)
@@ -118,21 +137,35 @@ export function useRoom() {
         peerSelections.value = peers
       }
     }
-    socket.onclose = () => {
-      if (disposed) return
-      connected.value = false
-      peerSelections.value = new Map()
-      status.value = 'Связь прервалась. Переподключение…'
+    current.onclose = () => {
+      if (socket !== current) return
+      disconnect()
+      if (navigator.onLine === false) return
       timer = window.setTimeout(connect, retryDelay)
       retryDelay = Math.min(retryDelay * 2, 10000)
     }
   }
 
-  onMounted(connect)
-  onUnmounted(() => {
-    disposed = true
+  function disconnect() {
     window.clearTimeout(timer)
-    socket?.close()
+    const previous = socket
+    socket = undefined
+    previous?.close()
+    connected.value = false
+    onlineAuthors.value = null
+    peerSelections.value = new Map()
+    status.value = 'Связь прервалась. Переподключение…'
+  }
+
+  onMounted(() => {
+    window.addEventListener('offline', disconnect)
+    window.addEventListener('online', connect)
+    connect()
+  })
+  onUnmounted(() => {
+    window.removeEventListener('offline', disconnect)
+    window.removeEventListener('online', connect)
+    disconnect()
   })
 
   async function request(path: string, init: RequestInit) {
@@ -156,6 +189,7 @@ export function useRoom() {
     context,
     busy,
     connected,
+    onlineAuthors,
     status,
     request,
     peerSelections,

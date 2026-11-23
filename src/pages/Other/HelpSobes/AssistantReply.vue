@@ -51,15 +51,19 @@ const html = computed(() => {
     font-size: 1.1em;
   }
 
+  a {
+    color: var(--room-accent);
+  }
+
   :not(pre) > code {
-    background: #fff;
+    background: var(--room-code);
     border-radius: 4px;
     padding: 0.05em 0.3em;
   }
 
   pre {
-    background: #fff;
-    border: 1px solid #d9d9d9;
+    background: var(--room-code);
+    border: 1px solid var(--room-line);
     border-radius: 8px;
     margin-block: 0.5em;
     overflow-wrap: normal;

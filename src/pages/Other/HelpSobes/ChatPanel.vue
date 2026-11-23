@@ -3,6 +3,12 @@
     <section :aria-labelledby="channel + '-title'">
       <header>
         <h2 :id="channel + '-title'" class="t-title">{{ title }}</h2>
+        <AuthorLabel
+          v-if="channel === 'chat'"
+          class="sender"
+          name="Друг"
+          :presence="presenceFor()"
+        />
         <span v-if="busy" class="notice" role="status">ИИ отвечает…</span>
         <slot name="actions" />
       </header>
@@ -21,19 +27,24 @@
           class="message"
           :class="{ own: message.author === me }"
         >
-          <p class="sender">
-            {{
+          <AuthorLabel
+            class="sender"
+            :name="
               message.author === 'assistant'
                 ? 'ИИ'
                 : message.author === me
                   ? 'Я'
                   : 'Друг'
-            }}
-          </p>
+            "
+            :presence="presenceFor(message.author)"
+            :created-at="message.createdAt"
+          />
           <template v-if="message.author === 'assistant'">
             <AssistantReply
               v-if="message.text"
-              :data-selection-message="channel === 'ai' ? message.id : undefined"
+              :data-selection-message="
+                channel === 'ai' ? message.id : undefined
+              "
               :text="message.text"
               :incomplete="
                 message.interrupted || (busy && index === messages.length - 1)
@@ -45,7 +56,9 @@
             v-else
             class="body"
             :data-selection-message="channel === 'ai' ? message.id : undefined"
-          >{{ message.text }}</p>
+          >
+            {{ message.text }}
+          </p>
         </div>
       </div>
       <p v-if="sendError" class="error" role="alert">{{ sendError }}</p>
@@ -72,6 +85,7 @@
 import { ref, watch } from 'vue'
 
 import AssistantReply from './AssistantReply.vue'
+import AuthorLabel from './AuthorLabel.vue'
 import type { Channel, RoomMessage, RoomSelection } from './useRoom'
 import { useSharedSelection } from './useSharedSelection'
 
@@ -84,6 +98,8 @@ const props = defineProps<{
   placeholder: string
   messages: RoomMessage[]
   me: string
+  connected: boolean
+  onlineAuthors: ReadonlySet<string> | null
   disabled: boolean
   busy?: boolean
   peerSelections?: ReadonlyMap<string, RoomSelection>
@@ -107,6 +123,16 @@ const draft = ref('')
 const sending = ref(false)
 const sendError = ref('')
 let followLatest = true
+
+function presenceFor(author?: string) {
+  if (author === 'assistant') return undefined
+  if (author === props.me) return props.connected ? 'online' : 'offline'
+  if (!props.onlineAuthors || author === 'guest') return 'unknown'
+  const online = author
+    ? props.onlineAuthors.has(author)
+    : Array.from(props.onlineAuthors).some((id) => id !== props.me)
+  return online ? 'online' : 'offline'
+}
 
 function trackScroll() {
   const box = log.value
@@ -167,13 +193,15 @@ function handleEnter(event: KeyboardEvent) {
 
 <style>
 ::highlight(sobes-peer-selection) {
-  background-color: #ffe294;
+  background-color: var(--room-highlight, #ffe294);
   color: #242424;
 }
 </style>
 
 <style scoped lang="scss">
 .panel {
+  background-color: var(--room-surface);
+  border-color: var(--room-line);
   border-radius: 10px;
   min-height: 0;
   min-width: 0;
@@ -198,12 +226,13 @@ header {
   min-height: 28px;
 
   h2 {
+    color: var(--room-text);
     margin-inline-end: auto;
   }
 }
 
 .log {
-  border-block: 1px solid #d9d9d9;
+  border-block: 1px solid var(--room-line);
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -216,7 +245,7 @@ header {
 
 .message {
   align-self: flex-start;
-  background: $palette-bg;
+  background: var(--room-raised);
   border-radius: 8px;
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -225,12 +254,12 @@ header {
 
 .own {
   align-self: flex-end;
-  background: #e8f3ff;
+  background: var(--room-own);
 }
 
 .sender,
 .notice {
-  color: $color-comment;
+  color: var(--room-muted);
   font-size: $size-comment;
   font-weight: $weight-title;
 }
@@ -241,8 +270,10 @@ header {
 }
 
 textarea {
-  border: 1px solid #aeb4bc;
+  background: var(--room-input);
+  border: 1px solid var(--room-field-border);
   border-radius: 8px;
+  color: var(--room-text);
   field-sizing: content;
   flex: 1;
   font-size: 16px;
@@ -252,20 +283,30 @@ textarea {
   min-width: 0;
   padding: 5px 8px;
   resize: none;
+
+  &::placeholder {
+    color: var(--room-muted);
+  }
 }
 
 .send {
-  background: #1664ad;
+  background: var(--room-accent);
+  color: var(--room-on-accent);
   flex: none;
   font-size: $size-comment;
   height: 34px;
   margin: 0;
   padding-inline: 10px;
   width: auto;
+
+  &:hover:not(:disabled) {
+    background: var(--room-accent);
+    filter: brightness(1.08);
+  }
 }
 
 .error {
-  color: #a32121;
+  color: var(--room-error);
   font-size: $size-comment;
 }
 </style>
