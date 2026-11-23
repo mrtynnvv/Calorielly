@@ -8,10 +8,14 @@ export type RoomMessage = {
   text: string
 }
 
+type RoomModel = { id: string; label: string }
+
 type RoomEvent =
   | {
       type: 'state'
       messages: RoomMessage[]
+      model: string
+      models: RoomModel[]
       context: { text: string; revision: number }
       busy: boolean
     }
@@ -49,6 +53,8 @@ export function useRoom() {
   const messages = ref<RoomMessage[]>([])
   const context = ref({ text: '', revision: 0 })
   const busy = ref(false)
+  const model = ref<string | null>(null)
+  const models = ref<RoomModel[]>([])
   let disposed = false
   let retryDelay = 1000
   let timer: number | undefined
@@ -67,6 +73,8 @@ export function useRoom() {
       const event: RoomEvent = JSON.parse(data)
       if (event.type === 'state') {
         messages.value = event.messages
+        model.value = event.model ?? null
+        models.value = event.models ?? []
         context.value = event.context
         busy.value = event.busy
         connected.value = true
@@ -109,6 +117,8 @@ export function useRoom() {
 
   return {
     me,
+    model,
+    models,
     context,
     busy,
     connected,

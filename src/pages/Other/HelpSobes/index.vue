@@ -14,6 +14,15 @@
       >
         <template #actions>
           <div class="actions">
+            <div v-if="models.length" class="model-select">
+              <UiSelect
+                aria-label="Модель ИИ"
+                :model-value="model"
+                :options="modelOptions"
+                :disabled="!connected || changingModel"
+                @update:model-value="changeModel"
+              />
+            </div>
             <button
               ref="editButton"
               class="action"
@@ -101,9 +110,13 @@ import { computed, nextTick, ref } from 'vue'
 import ChatPanel from './ChatPanel.vue'
 import { type Channel, useRoom } from './useRoom'
 
+import UiSelect from '@/components/ui/UiSelect.vue'
+
 const {
   me,
   context,
+  model,
+  models,
   busy,
   connected,
   status,
@@ -118,9 +131,18 @@ const draft = ref('')
 const draftRevision = ref(0)
 const saving = ref(false)
 const resetting = ref(false)
+const changingModel = ref(false)
+const modelOptions = computed(() =>
+  models.value.map(({ id, label }) => ({ value: id, label })),
+)
 const error = ref('')
 const aiLocked = computed(
-  () => !connected.value || busy.value || resetting.value || saving.value,
+  () =>
+    !connected.value ||
+    busy.value ||
+    resetting.value ||
+    saving.value ||
+    changingModel.value,
 )
 const canReset = computed(
   () => connected.value && !resetting.value && aiMessages.value.length > 0,
@@ -172,6 +194,24 @@ async function saveContext() {
     saving.value = false
   }
   await closeEditor()
+}
+
+async function changeModel(id: string) {
+  if (!connected.value || changingModel.value || id === model.value) return
+  changingModel.value = true
+  error.value = ''
+  try {
+    await request('/model', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: id }),
+    })
+  } catch (cause) {
+    error.value =
+      cause instanceof Error ? cause.message : 'Не удалось изменить модель.'
+  } finally {
+    changingModel.value = false
+  }
 }
 
 function sendMessage(channel: Channel, text: string) {
@@ -232,6 +272,10 @@ async function resetHistory() {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.model-select {
+  width: min(230px, 100%);
 }
 
 .editor {

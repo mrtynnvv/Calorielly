@@ -47,7 +47,7 @@
   </div>
 </template>
 
-<script setup lang="ts" generic="T extends number | string[] = number">
+<script setup lang="ts" generic="T extends number | string | string[] = number">
 import { computed, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 
 defineOptions({ inheritAttrs: false })

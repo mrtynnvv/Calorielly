@@ -92,7 +92,17 @@ watch(
   },
   () => {
     const box = log.value
-    if (box && followLatest) box.scrollTop = box.scrollHeight
+    if (!box || !followLatest) return
+    const latest = props.messages[props.messages.length - 1]
+    const bubble = box.lastElementChild
+    if (latest?.author === 'assistant' && bubble) {
+      // Оставляем начало длинного ответа в поле зрения во время генерации.
+      const distance =
+        bubble.getBoundingClientRect().top - box.getBoundingClientRect().top
+      if (distance > 0) box.scrollTop += distance
+    } else {
+      box.scrollTop = box.scrollHeight
+    }
   },
   { flush: 'post' },
 )
