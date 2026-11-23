@@ -130,11 +130,18 @@
           v-if="channel !== 'chat' && transcribe"
           type="button"
           class="microphone"
-          :class="{ recording: phase === 'recording' }"
+          :class="{
+            recording: phase === 'recording',
+            'choose-source': needsSource,
+          }"
           :aria-label="dictationLabel"
           :title="dictationLabel"
           :aria-pressed="phase === 'recording' || phase === 'starting'"
-          :aria-busy="phase === 'starting' || phase === 'finishing'"
+          :aria-busy="
+            phase === 'selecting' ||
+            phase === 'starting' ||
+            phase === 'finishing'
+          "
           :disabled="
             sending || phase === 'finishing' || (!connected && phase === 'idle')
           "
@@ -151,7 +158,11 @@
             stroke-width="1.8"
           >
             <rect
-              v-if="phase === 'recording' || phase === 'starting'"
+              v-if="
+                phase === 'recording' ||
+                phase === 'starting' ||
+                phase === 'selecting'
+              "
               x="5"
               y="5"
               width="14"
@@ -173,6 +184,7 @@
               <path d="M5 10v2a7 7 0 0 0 14 0v-2m-7 9v3m-3 0h6" />
             </g>
           </svg>
+          <span v-if="needsSource">Выбрать источник</span>
         </button>
         <UiButton
           type="submit"
@@ -268,6 +280,8 @@ function endComposition() {
 const {
   phase,
   error: dictationError,
+  displayReady,
+  selectDisplay,
   start,
   finish,
   cancel,
@@ -276,16 +290,22 @@ const {
   appendPhrase,
   props.channel === 'system' ? 'display' : 'microphone',
 )
+const needsSource = computed(
+  () =>
+    props.channel === 'system' && !displayReady.value && phase.value === 'idle',
+)
 const dictationLabel = computed(
   () =>
     ({
-      idle:
-        props.channel === 'system'
+      idle: needsSource.value
+        ? 'Выбрать источник звука'
+        : props.channel === 'system'
           ? 'Распознавать звук компьютера'
           : 'Начать диктовку',
+      selecting: 'Отменить выбор источника звука',
       starting:
         props.channel === 'system'
-          ? 'Отменить выбор источника звука'
+          ? 'Отменить включение распознавания'
           : 'Отменить включение микрофона',
       recording:
         props.channel === 'system'
@@ -297,7 +317,9 @@ const dictationLabel = computed(
 
 function toggleRecording() {
   sendError.value = ''
-  if (phase.value === 'idle') {
+  if (needsSource.value) {
+    void selectDisplay()
+  } else if (phase.value === 'idle') {
     input.value?.focus({ preventScroll: true })
     void start()
   } else void finish()
@@ -578,6 +600,13 @@ textarea {
   justify-content: center;
   padding: 0;
   width: 34px;
+
+  &.choose-source {
+    font-size: $size-comment;
+    gap: 4px;
+    padding-inline: 6px;
+    width: auto;
+  }
 
   &.recording {
     color: var(--room-error);

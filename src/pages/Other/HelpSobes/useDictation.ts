@@ -1,4 +1,4 @@
-import { onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 
 import recorderUrl from './dictation.worklet.js?url&no-inline'
 
@@ -63,12 +63,89 @@ export function useDictation(
   source: 'microphone' | 'display' = 'microphone',
 ) {
   const display = source === 'display'
-  const phase = ref<'idle' | 'starting' | 'recording' | 'finishing'>('idle')
+  const phase = ref<
+    'idle' | 'selecting' | 'starting' | 'recording' | 'finishing'
+  >('idle')
   const error = ref('')
+  const displayStream = shallowRef<MediaStream>()
+  let selection: symbol | undefined
   let session: Session | undefined
 
+  function releaseDisplay() {
+    const stream = displayStream.value
+    displayStream.value = undefined
+    for (const track of stream?.getTracks() ?? []) {
+      track.removeEventListener('ended', displayEnded)
+      track.stop()
+    }
+  }
+
+  function displayEnded() {
+    releaseDisplay()
+    error.value = 'Передача звука завершена.'
+    void finish()
+  }
+
+  async function selectDisplay() {
+    if (!display || displayStream.value || phase.value !== 'idle') return
+    error.value = ''
+    if (
+      !navigator.mediaDevices?.getDisplayMedia ||
+      !window.AudioContext ||
+      !window.AudioWorkletNode
+    ) {
+      error.value =
+        'Этот браузер не поддерживает захват звука вкладки или экрана.'
+      return
+    }
+    const request = Symbol()
+    selection = request
+    phase.value = 'selecting'
+    try {
+      const stream =
+        await navigator.mediaDevices.getDisplayMedia(displayAudioOptions)
+      if (selection !== request) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
+      displayStream.value = stream
+      if (
+        !stream.getAudioTracks().some((track) => track.readyState === 'live')
+      ) {
+        releaseDisplay()
+        error.value =
+          'Источник не передал звук. Выберите вкладку или экран и включите в окне выбора передачу аудио.'
+        return
+      }
+      // Keep the browser share available between recordings, with all tracks muted.
+      for (const track of stream.getTracks()) {
+        track.enabled = false
+        track.addEventListener('ended', displayEnded)
+      }
+    } catch (reason) {
+      if (selection !== request) return
+      releaseDisplay()
+      error.value =
+        reason instanceof Error && reason.name === 'NotAllowedError'
+          ? 'Передача звука не разрешена. Выберите источник и подтвердите доступ в браузере.'
+          : 'Не удалось получить звук. Проверьте разрешение на запись экрана и звука или выберите вкладку со звуком.'
+    } finally {
+      if (selection === request) {
+        selection = undefined
+        phase.value = 'idle'
+      }
+    }
+  }
+
+  function stopInput(current: Session) {
+    for (const track of current.stream?.getTracks() ?? []) {
+      if (display) track.enabled = false
+      else track.stop()
+    }
+  }
+
   function release(current: Session) {
-    current.stream?.getTracks().forEach((track) => track.stop())
+    stopInput(current)
     current.recorder?.disconnect()
     current.recorder?.port.close()
     if (current.context.state !== 'closed')
@@ -76,6 +153,10 @@ export function useDictation(
   }
 
   function cancel() {
+    if (selection) {
+      selection = undefined
+      phase.value = 'idle'
+    }
     const current = session
     if (!current) return
     session = undefined
@@ -93,18 +174,14 @@ export function useDictation(
   }
 
   async function start() {
-    if (session) return
+    if (phase.value !== 'idle' || (display && !displayStream.value)) return
     error.value = ''
     if (
-      !(display
-        ? navigator.mediaDevices?.getDisplayMedia
-        : navigator.mediaDevices?.getUserMedia) ||
+      (!display && !navigator.mediaDevices?.getUserMedia) ||
       !window.AudioContext ||
       !window.AudioWorkletNode
     ) {
-      error.value = display
-        ? 'Этот браузер не поддерживает захват звука вкладки или экрана.'
-        : 'Диктовка недоступна в этом браузере.'
+      error.value = 'Диктовка недоступна в этом браузере.'
       return
     }
     let context: AudioContext
@@ -128,16 +205,15 @@ export function useDictation(
     session = current
     phase.value = 'starting'
     try {
-      const capture = display
-        ? navigator.mediaDevices.getDisplayMedia(displayAudioOptions)
+      const capture = displayStream.value
+        ? Promise.resolve(displayStream.value)
         : navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } })
       const [stream] = await Promise.all([
         capture.then((stream) => {
           if (session === current) {
             current.stream = stream
-            // Screen Capture requires video, but the recorder uses only audio.
-            for (const track of stream.getVideoTracks()) track.enabled = false
-          } else stream.getTracks().forEach((track) => track.stop())
+          } else if (!display)
+            stream.getTracks().forEach((track) => track.stop())
           return stream
         }),
         context.resume(),
@@ -148,11 +224,12 @@ export function useDictation(
         .getAudioTracks()
         .find((track) => track.readyState === 'live')
       if (!audioTrack) {
+        if (display) releaseDisplay()
         fail(
           current,
           new Error(
             display
-              ? 'Источник не передал звук. Выберите вкладку или экран и включите в окне выбора передачу аудио.'
+              ? 'Передача звука завершена. Выберите источник ещё раз.'
               : 'Микрофон не найден.',
           ),
         )
@@ -188,28 +265,27 @@ export function useDictation(
           current,
           new Error('Запись прервалась. Запустите распознавание ещё раз.'),
         )
-      const sourceEnded = () => {
-        if (session === current && phase.value === 'recording') {
-          error.value = display
-            ? 'Передача звука завершена.'
-            : 'Микрофон отключён.'
-          void finish()
-        }
+      if (!display) {
+        audioTrack.addEventListener(
+          'ended',
+          () => {
+            if (session !== current || phase.value !== 'recording') return
+            error.value = 'Микрофон отключён.'
+            void finish()
+          },
+          { once: true },
+        )
       }
-      for (const track of stream.getTracks())
-        track.addEventListener('ended', sourceEnded, { once: true })
       context
         .createMediaStreamSource(new MediaStream([audioTrack]))
         .connect(recorder)
+      audioTrack.enabled = true
       phase.value = 'recording'
     } catch (reason) {
       const name = reason instanceof Error ? reason.name : ''
       let message: string
       if (display) {
-        message =
-          name === 'NotAllowedError'
-            ? 'Передача звука не разрешена. Выберите источник и подтвердите доступ в браузере.'
-            : 'Не удалось получить звук. Проверьте разрешение на запись экрана и звука или выберите вкладку со звуком.'
+        message = 'Не удалось запустить распознавание звука компьютера.'
       } else {
         message =
           name === 'NotAllowedError'
@@ -224,15 +300,14 @@ export function useDictation(
 
   async function finish(): Promise<boolean> {
     const current = session
-    if (!current) return true
-    if (!current.recorder) {
+    if (!current?.recorder) {
       cancel()
       return true
     }
     if (current.finish) return current.finish
     phase.value = 'finishing'
     current.recorder.port.postMessage('stop')
-    current.stream?.getTracks().forEach((track) => track.stop())
+    stopInput(current)
     current.finish = (async () => {
       const timeout = window.setTimeout(
         () => fail(current, new Error('Не удалось завершить запись звука.')),
@@ -251,6 +326,23 @@ export function useDictation(
     return current.finish
   }
 
-  onUnmounted(cancel)
-  return { phase, error, start, finish, cancel }
+  function leave() {
+    cancel()
+    releaseDisplay()
+  }
+
+  onMounted(() => window.addEventListener('pagehide', leave))
+  onUnmounted(() => {
+    window.removeEventListener('pagehide', leave)
+    leave()
+  })
+  return {
+    phase,
+    error,
+    displayReady: computed(() => !!displayStream.value),
+    selectDisplay,
+    start,
+    finish,
+    cancel,
+  }
 }
