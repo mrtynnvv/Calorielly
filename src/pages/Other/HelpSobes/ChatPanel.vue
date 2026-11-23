@@ -157,7 +157,7 @@ const props = defineProps<{
   savedSelections?: readonly RoomSelection[]
   markError?: string
   publishSelection?: (range: RoomSelection | null) => void
-  saveMark?: (range: RoomSelection) => void
+  toggleMark?: (range: RoomSelection) => boolean
   send: (channel: Channel, text: string) => Promise<void>
 }>()
 
@@ -173,7 +173,7 @@ if (props.channel === 'ai')
     () => props.peerSelections,
     () => props.savedSelections,
     (range) => props.publishSelection?.(range),
-    (range) => props.saveMark?.(range),
+    (range) => props.toggleMark?.(range),
   )
 const input = ref<HTMLTextAreaElement | null>(null)
 const draft = ref('')

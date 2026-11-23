@@ -112,7 +112,7 @@ export function useSharedSelection(
   peers: () => ReadonlyMap<string, RoomSelection> | undefined,
   marks: () => readonly RoomSelection[] | undefined,
   publish: (range: RoomSelection | null) => void,
-  save: (range: RoomSelection) => void,
+  toggle: (range: RoomSelection) => boolean | undefined,
 ) {
   let frame = 0
   let completed: RoomSelection | null = null
@@ -141,13 +141,25 @@ export function useSharedSelection(
   }
 
   function finishSelection() {
-    completed = currentRange()
-    if (completed) save(completed)
+    const range = currentRange()
+    // У сенсорного жеста могут сработать и pointerup, и touchend.
+    if (range && !sameSelection(range, completed)) {
+      completed = range
+      if (toggle(range) === false) document.getSelection()?.removeAllRanges()
+    }
     publish(null)
   }
 
   function startPointer(event: PointerEvent) {
     if (!event.isPrimary || event.button !== 0) return
+    // Иначе браузер начнёт перетаскивать уже выделенный текст.
+    if (
+      event.pointerType === 'mouse' &&
+      !event.shiftKey &&
+      completed &&
+      sameSelection(currentRange(), completed)
+    )
+      document.getSelection()?.removeAllRanges()
     pointer = event.pointerId
     completed = null
   }
