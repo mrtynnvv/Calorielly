@@ -112,7 +112,7 @@ export function useSharedSelection(
   peers: () => ReadonlyMap<string, RoomSelection> | undefined,
   marks: () => readonly RoomSelection[] | undefined,
   publish: (range: RoomSelection | null) => void,
-  toggle: (range: RoomSelection) => boolean | undefined,
+  save: (range: RoomSelection) => void,
 ) {
   let frame = 0
   let completed: RoomSelection | null = null
@@ -145,7 +145,7 @@ export function useSharedSelection(
     // У сенсорного жеста могут сработать и pointerup, и touchend.
     if (range && !sameSelection(range, completed)) {
       completed = range
-      if (toggle(range) === false) document.getSelection()?.removeAllRanges()
+      save(range)
     }
     publish(null)
   }

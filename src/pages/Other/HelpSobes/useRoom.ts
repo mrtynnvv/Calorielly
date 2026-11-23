@@ -16,11 +16,6 @@ type RoomTodo = { id: string; text: string }
 export type SelectionPoint = { id: number; offset: number }
 export type RoomSelection = { start: SelectionPoint; end: SelectionPoint }
 type RoomMark = { id: number; author: string; range: RoomSelection }
-type MarkChange = {
-  type: 'mark' | 'unmark'
-  range: RoomSelection
-  operationId: string
-}
 
 export function sameSelection(
   a: RoomSelection | null,
@@ -50,8 +45,8 @@ type RoomEvent =
   | { type: 'presence'; onlineAuthors: string[] }
   | { type: 'todos'; todos: RoomTodo[] }
   | { type: 'selection'; peer: string; range: RoomSelection | null }
-  | { type: 'marks'; marks: RoomMark[]; operationId?: string }
-  | { type: 'mark-error'; message: string; operationId?: string }
+  | { type: 'marks'; marks: RoomMark[] }
+  | { type: 'mark-error'; message: string; range?: RoomSelection }
 
 function getAuthorId() {
   const key = 'help-sobes.author'
@@ -93,21 +88,7 @@ export function useRoom() {
     new Map(),
   )
   const marks = shallowRef<RoomMark[]>([])
-  const pendingMarks = shallowRef<MarkChange[]>([])
-  const mySelections = computed(() => [
-    ...marks.value
-      .filter(
-        (mark) =>
-          mark.author === me &&
-          !pendingMarks.value.some((change) =>
-            sameSelection(change.range, mark.range),
-          ),
-      )
-      .map((mark) => mark.range),
-    ...pendingMarks.value
-      .filter((change) => change.type === 'mark')
-      .map((change) => change.range),
-  ])
+  const pendingMarks = shallowRef<RoomSelection[]>([])
   const markError = ref('')
   let localSelection: RoomSelection | null = null
   let retryDelay = 1000
@@ -125,35 +106,29 @@ export function useRoom() {
     sendSocket({ type: 'selection', range })
   }
 
-  function toggleMark(range: RoomSelection) {
-    const marked = !mySelections.value.some((saved) =>
-      sameSelection(range, saved),
+  function hasOwnMark(range: RoomSelection) {
+    return marks.value.some(
+      (mark) => mark.author === me && sameSelection(mark.range, range),
     )
-    const change: MarkChange = {
-      type: marked ? 'mark' : 'unmark',
-      range,
-      operationId: crypto.randomUUID(),
-    }
-    markError.value = ''
-    pendingMarks.value = [
-      ...pendingMarks.value.filter(
-        (pending) => !sameSelection(pending.range, range),
-      ),
-      change,
-    ]
-    sendSocket(change)
-    return marked
   }
 
-  function acknowledgeMark(operationId?: string) {
+  function saveMark(range: RoomSelection) {
     if (
-      !pendingMarks.value.some((change) => change.operationId === operationId)
+      hasOwnMark(range) ||
+      pendingMarks.value.some((pending) => sameSelection(pending, range))
     )
-      return false
-    pendingMarks.value = pendingMarks.value.filter(
-      (change) => change.operationId !== operationId,
-    )
-    return true
+      return
+    markError.value = ''
+    pendingMarks.value = [...pendingMarks.value, range]
+    sendSocket({ type: 'mark', range })
+  }
+
+  function receiveMarks(saved: RoomMark[]) {
+    marks.value = saved
+    if (pendingMarks.value.length)
+      pendingMarks.value = pendingMarks.value.filter(
+        (range) => !hasOwnMark(range),
+      )
   }
 
   function clearMyMarks() {
@@ -198,14 +173,15 @@ export function useRoom() {
           : null
         const reconnecting = !connected.value
         connected.value = true
-        marks.value = event.marks ?? []
+        receiveMarks(event.marks ?? [])
         if (pendingMarks.value.length) {
           const ids = new Set(event.messages.map((message) => message.id))
           pendingMarks.value = pendingMarks.value.filter(
-            ({ range }) => ids.has(range.start.id) && ids.has(range.end.id),
+            (range) => ids.has(range.start.id) && ids.has(range.end.id),
           )
           if (reconnecting)
-            for (const change of pendingMarks.value) sendSocket(change)
+            for (const range of pendingMarks.value)
+              sendSocket({ type: 'mark', range })
         }
         if (reconnecting && localSelection)
           sendSocket({ type: 'selection', range: localSelection })
@@ -219,11 +195,14 @@ export function useRoom() {
       } else if (event.type === 'todos') {
         todos.value = event.todos
       } else if (event.type === 'marks') {
-        marks.value = event.marks
-        acknowledgeMark(event.operationId)
+        receiveMarks(event.marks)
       } else if (event.type === 'mark-error') {
-        if (acknowledgeMark(event.operationId) || !event.operationId)
-          markError.value = event.message
+        const rejected = event.range
+        if (rejected)
+          pendingMarks.value = pendingMarks.value.filter(
+            (range) => !sameSelection(range, rejected),
+          )
+        markError.value = event.message
       } else if (event.type === 'selection') {
         const peers = new Map(peerSelections.value)
         if (event.range) peers.set(event.peer, event.range)
@@ -294,14 +273,16 @@ export function useRoom() {
     peerSelections,
     publishSelection,
     savedSelections: computed(() => [
-      ...marks.value
-        .filter((mark) => mark.author !== me)
-        .map((mark) => mark.range),
-      ...mySelections.value,
+      ...marks.value.map((mark) => mark.range),
+      ...pendingMarks.value,
     ]),
-    hasMyMarks: computed(() => mySelections.value.length > 0),
+    hasMyMarks: computed(
+      () =>
+        pendingMarks.value.length > 0 ||
+        marks.value.some((mark) => mark.author === me),
+    ),
     markError,
-    toggleMark,
+    saveMark,
     clearMyMarks,
     aiMessages: computed(() =>
       messages.value.filter((item) => item.channel === 'ai'),

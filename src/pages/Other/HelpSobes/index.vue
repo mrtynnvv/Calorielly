@@ -19,7 +19,7 @@
           :peer-selections="peerSelections"
           :saved-selections="savedSelections"
           :mark-error="markError"
-          :toggle-mark="toggleMark"
+          :save-mark="saveMark"
           :publish-selection="publishSelection"
         >
           <template #actions>
@@ -234,7 +234,7 @@ const {
   savedSelections,
   markError,
   hasMyMarks,
-  toggleMark,
+  saveMark,
   clearMyMarks,
   publishSelection,
   request,
