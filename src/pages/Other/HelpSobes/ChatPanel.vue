@@ -16,7 +16,7 @@
         @scroll="trackScroll"
       >
         <div
-          v-for="message in messages"
+          v-for="(message, index) in messages"
           :key="message.id"
           class="message"
           :class="{ own: message.author === me }"
@@ -30,7 +30,12 @@
                   : 'Друг'
             }}
           </p>
-          <p class="body">{{ message.text }}</p>
+          <AssistantReply
+            v-if="message.author === 'assistant'"
+            :text="message.text"
+            :streaming="busy && index === messages.length - 1"
+          />
+          <p v-else class="body">{{ message.text }}</p>
         </div>
       </div>
       <p v-if="busy" class="notice" role="status">ИИ отвечает…</p>
@@ -57,6 +62,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 
+import AssistantReply from './AssistantReply.vue'
 import type { Channel, RoomMessage } from './useRoom'
 
 import UiBlock from '@/components/ui/UiBlock.vue'
