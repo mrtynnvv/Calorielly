@@ -33,6 +33,7 @@
           <EnterStep1
             v-if="steps === 'enter' || steps === 'enterPassword'"
             @change-step="onChangeStep"
+            @signed-in="finishAuth"
           />
           <RegisterStep1
             v-if="steps === 'reg1'"
@@ -43,6 +44,7 @@
             v-if="steps === 'reg2'"
             :login="login"
             @change-step="onChangeStep"
+            @signed-in="finishAuth"
           />
         </div>
       </div>
@@ -52,6 +54,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import EnterStep1 from './components/EnterStep1.vue'
 import RegisterStep1 from './components/RegisterStep1.vue'
@@ -63,9 +66,14 @@ const login = ref<string>('')
 const inner = ref<HTMLDivElement | null>(null)
 const showHeight = ref('0px')
 type Step = 'reg1' | 'reg2' | 'enter' | 'enterPassword'
-const steps = ref<Step>('reg1')
+const route = useRoute()
+const router = useRouter()
+const steps = ref<Step>(route.query.next === '/help-sobes' ? 'enter' : 'reg1')
+function finishAuth() {
+  void router.push(route.query.next === '/help-sobes' ? '/help-sobes' : '/feed')
+}
 const switchAuth = () => {
-  steps.value === 'reg1' ? (steps.value = 'enter') : (steps.value = 'reg1')
+  steps.value = steps.value === 'reg1' ? 'enter' : 'reg1'
 }
 
 const onChangeStep = (s: Step | string) => {

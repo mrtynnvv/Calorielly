@@ -67,7 +67,7 @@ const props = defineProps<{
   title: string
   placeholder: string
   messages: RoomMessage[]
-  me: '1' | '2' | null
+  me: string
   disabled: boolean
   busy?: boolean
   send: (channel: Channel, text: string) => Promise<void>

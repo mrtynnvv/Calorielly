@@ -19,16 +19,15 @@
 <script setup lang="ts">
 import axios from 'axios'
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 
 import UiButton from '@/components/ui/UiButton.vue'
 import UiInput from '@/components/ui/UiInput.vue'
 import { useUser } from '@/store/User'
 const API_BASE = import.meta.env.VITE_API_BASE
 const userStore = useUser()
-const router = useRouter()
 const emit = defineEmits<{
   (e: 'change-step', value: string): void
+  (e: 'signed-in'): void
 }>()
 const login = ref('+7')
 const password = ref('')
@@ -59,7 +58,7 @@ async function enter() {
       },
     )
     userStore.token = data.accessToken
-    router.push('/feed')
+    emit('signed-in')
   } catch (e) {
     console.log(e)
   }

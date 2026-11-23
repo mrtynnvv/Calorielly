@@ -178,7 +178,7 @@ function sendMessage(channel: Channel, text: string) {
   return request('/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channel, text }),
+    body: JSON.stringify({ channel, text, author: me }),
   })
 }
 

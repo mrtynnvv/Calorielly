@@ -33,7 +33,7 @@ const routes = [
     path: '/help-sobes',
     name: 'help-sobes',
     component: () => import('@/pages/Other/HelpSobes/index.vue'),
-    meta: { blank: true, roomInvite: true },
+    meta: { blank: true },
   },
   { path: '/budget', component: budget, meta: { blank: true } },
   { path: '/game', component: game, meta: { blank: true } },
@@ -50,25 +50,22 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  if (to.meta.roomInvite) return true
-  if (IS_DEMO) {
-    if (to.path === '/auth') return '/feed'
-    return true
-  }
-  if (location.hostname.startsWith('demo')) {
-    if (to.path === '/auth') return '/feed'
+  if (IS_DEMO || location.hostname.startsWith('demo')) {
+    if (to.path === '/auth' || to.name === 'help-sobes') return '/feed'
     return true
   }
   const user = useUser()
   const authed = !!user.token && isJwtValid(user.token)
-  //на /auth авторизованного юзера кидает в /feed
   if (to.path === '/auth') {
-    if (authed) return '/feed'
+    if (authed) return to.query.next === '/help-sobes' ? '/help-sobes' : '/feed'
     return true
   }
   // все остальные роуты только для авторизованных
   if (!authed) {
     user.clear()
+    if (to.name === 'help-sobes') {
+      return { path: '/auth', query: { next: '/help-sobes' } }
+    }
     return '/auth'
   }
   return true

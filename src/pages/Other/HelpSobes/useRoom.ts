@@ -1,12 +1,10 @@
-import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 export type Channel = 'ai' | 'chat'
-type Participant = '1' | '2'
 export type RoomMessage = {
   id: number
   channel: Channel
-  author: Participant | 'assistant'
+  author: string
   text: string
 }
 
@@ -14,13 +12,19 @@ type RoomEvent =
   | {
       type: 'state'
       messages: RoomMessage[]
-      me: Participant
       context: { text: string; revision: number }
       busy: boolean
     }
   | { type: 'delta'; id: number; text: string }
 
-const sessionKey = 'help-sobes.invite'
+function getAuthorId() {
+  const key = 'help-sobes.author'
+  const existing = localStorage.getItem(key)
+  if (existing) return existing
+  const id = crypto.randomUUID()
+  localStorage.setItem(key, id)
+  return id
+}
 
 function getApiUrl() {
   const value =
@@ -38,108 +42,62 @@ function getApiUrl() {
 }
 
 export function useRoom() {
-  const route = useRoute()
-  const router = useRouter()
   const apiUrl = getApiUrl()
-  const token = ref(sessionStorage.getItem(sessionKey) ?? '')
+  const me = getAuthorId()
   const connected = ref(false)
-  const status = ref('')
+  const status = ref('Подключение…')
   const messages = ref<RoomMessage[]>([])
-  const me = ref<Participant | null>(null)
   const context = ref({ text: '', revision: 0 })
   const busy = ref(false)
+  let disposed = false
+  let retryDelay = 1000
+  let timer: number | undefined
+  let socket: WebSocket | undefined
 
-  watch(
-    () => (route.name === 'help-sobes' ? route.hash : ''),
-    (hash) => {
-      const invite = new URLSearchParams(hash.slice(1)).get('invite')
-      if (invite === null) return
-      sessionStorage.setItem(sessionKey, invite)
-      token.value = invite
-      void router.replace({ path: route.path, query: route.query, hash: '' })
-    },
-    { immediate: true },
-  )
-
-  watch(
-    token,
-    (invite, _, onCleanup) => {
+  function connect() {
+    if (!apiUrl) {
+      status.value = 'Адрес сервера комнаты не настроен.'
+      return
+    }
+    const wsUrl = new URL(apiUrl + '/room')
+    wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+    socket = new WebSocket(wsUrl)
+    socket.onmessage = ({ data }) => {
+      if (disposed) return
+      const event: RoomEvent = JSON.parse(data)
+      if (event.type === 'state') {
+        messages.value = event.messages
+        context.value = event.context
+        busy.value = event.busy
+        connected.value = true
+        status.value = ''
+        retryDelay = 1000
+      } else if (event.type === 'delta') {
+        const message = messages.value.find((item) => item.id === event.id)
+        if (message) message.text += event.text
+      }
+    }
+    socket.onclose = () => {
+      if (disposed) return
       connected.value = false
-      messages.value = []
-      me.value = null
-      busy.value = false
-      context.value = { text: '', revision: 0 }
-      if (!invite || !apiUrl) {
-        status.value = !invite
-          ? 'Откройте комнату по своей ссылке-приглашению.'
-          : 'Адрес сервера комнаты не настроен.'
-        return
-      }
+      status.value = 'Связь прервалась. Переподключение…'
+      timer = window.setTimeout(connect, retryDelay)
+      retryDelay = Math.min(retryDelay * 2, 10000)
+    }
+  }
 
-      const wsUrl = new URL(apiUrl + '/room')
-      wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:'
-      let disposed = false
-      let retryDelay = 1000
-      let timer: number | undefined
-      let socket: WebSocket
-      status.value = 'Подключение…'
-      function connect() {
-        socket = new WebSocket(wsUrl)
-        socket.onopen = () => {
-          if (!disposed)
-            socket.send(JSON.stringify({ type: 'auth', token: invite }))
-        }
-        socket.onmessage = ({ data }) => {
-          if (disposed) return
-          const event: RoomEvent = JSON.parse(data)
-          if (event.type === 'state') {
-            messages.value = event.messages
-            context.value = event.context
-            busy.value = event.busy
-            me.value = event.me
-            connected.value = true
-            status.value = ''
-            retryDelay = 1000
-          } else if (event.type === 'delta') {
-            const message = messages.value.find((item) => item.id === event.id)
-            if (message) message.text += event.text
-          }
-        }
-        socket.onclose = ({ code }) => {
-          if (disposed) return
-          connected.value = false
-          if (code === 4401) {
-            sessionStorage.removeItem(sessionKey)
-            messages.value = []
-            context.value = { text: '', revision: 0 }
-            me.value = null
-            busy.value = false
-            status.value = 'Ссылка недействительна. Откройте новое приглашение.'
-            return
-          }
-          status.value = 'Связь прервалась. Переподключение…'
-          timer = window.setTimeout(connect, retryDelay)
-          retryDelay = Math.min(retryDelay * 2, 10000)
-        }
-      }
-
-      connect()
-      onCleanup(() => {
-        disposed = true
-        window.clearTimeout(timer)
-        socket.close()
-      })
-    },
-    { immediate: true },
-  )
+  onMounted(connect)
+  onUnmounted(() => {
+    disposed = true
+    window.clearTimeout(timer)
+    socket?.close()
+  })
 
   async function request(path: string, init: RequestInit) {
     if (!connected.value) throw new Error('Подождите подключения к комнате.')
-    const headers = new Headers(init.headers)
-    headers.set('Authorization', 'Bearer ' + token.value)
     let response: Response
     try {
-      response = await fetch(apiUrl + path, { ...init, headers })
+      response = await fetch(apiUrl + path, { ...init, credentials: 'omit' })
     } catch {
       throw new Error('Не удалось связаться с сервером.')
     }
