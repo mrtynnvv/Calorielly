@@ -138,12 +138,10 @@
           :aria-label="dictationLabel"
           :title="
             channel === 'system'
-              ? dictationLabel + ' (⌥⇧Пробел)'
+              ? dictationLabel + ' (⌥ + X / Ч)'
               : dictationLabel
           "
-          :aria-keyshortcuts="
-            channel === 'system' ? 'Alt+Shift+Space' : undefined
-          "
+          :aria-keyshortcuts="channel === 'system' ? 'Alt+X' : undefined"
           :aria-pressed="phase === 'recording' || phase === 'starting'"
           :aria-busy="
             phase === 'selecting' ||
@@ -337,9 +335,9 @@ function toggleRecording(focusInput: boolean) {
 if (props.channel === 'system') {
   function onAudioShortcut(event: KeyboardEvent) {
     if (
-      event.code !== 'Space' ||
+      event.code !== 'KeyX' ||
       !event.altKey ||
-      !event.shiftKey ||
+      event.shiftKey ||
       event.metaKey ||
       event.ctrlKey ||
       event.isComposing ||
