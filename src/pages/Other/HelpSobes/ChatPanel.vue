@@ -128,6 +128,7 @@
         />
         <button
           v-if="channel !== 'chat' && transcribe"
+          ref="dictationButton"
           type="button"
           class="microphone"
           :class="{
@@ -135,7 +136,14 @@
             'choose-source': needsSource,
           }"
           :aria-label="dictationLabel"
-          :title="dictationLabel"
+          :title="
+            channel === 'system'
+              ? dictationLabel + ' (⌥⇧Пробел)'
+              : dictationLabel
+          "
+          :aria-keyshortcuts="
+            channel === 'system' ? 'Alt+Shift+Space' : undefined
+          "
           :aria-pressed="phase === 'recording' || phase === 'starting'"
           :aria-busy="
             phase === 'selecting' ||
@@ -146,7 +154,7 @@
             sending || phase === 'finishing' || (!connected && phase === 'idle')
           "
           @mousedown.prevent
-          @click="toggleRecording"
+          @click="toggleRecording(true)"
         >
           <svg
             aria-hidden="true"
@@ -202,7 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import AssistantReply from './AssistantReply.vue'
 import AuthorLabel from './AuthorLabel.vue'
@@ -251,6 +259,7 @@ if (props.channel !== 'chat')
     props.channel,
   )
 const input = ref<HTMLTextAreaElement | null>(null)
+const dictationButton = ref<HTMLButtonElement | null>(null)
 const draft = ref('')
 let composing = false
 let afterComposition = ''
@@ -315,14 +324,40 @@ const dictationLabel = computed(
     })[phase.value],
 )
 
-function toggleRecording() {
+function toggleRecording(focusInput: boolean) {
   sendError.value = ''
   if (needsSource.value) {
     void selectDisplay()
   } else if (phase.value === 'idle') {
-    input.value?.focus({ preventScroll: true })
+    if (focusInput) input.value?.focus({ preventScroll: true })
     void start()
   } else void finish()
+}
+
+if (props.channel === 'system') {
+  function onAudioShortcut(event: KeyboardEvent) {
+    if (
+      event.code !== 'Space' ||
+      !event.altKey ||
+      !event.shiftKey ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.isComposing ||
+      event.defaultPrevented ||
+      props.collapsed ||
+      document.querySelector('dialog[open]')
+    )
+      return
+    event.preventDefault()
+    if (
+      !event.repeat &&
+      dictationButton.value &&
+      !dictationButton.value.disabled
+    )
+      toggleRecording(false)
+  }
+  onMounted(() => window.addEventListener('keydown', onAudioShortcut))
+  onUnmounted(() => window.removeEventListener('keydown', onAudioShortcut))
 }
 
 watch(
