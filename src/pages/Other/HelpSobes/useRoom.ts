@@ -13,6 +13,12 @@ export type RoomMessage = {
 }
 
 type RoomModel = { id: string; label: string }
+type ModelRouting = {
+  mode: 'auto' | 'manual'
+  checking: boolean
+  checkedAt: number | null
+  results: Partial<Record<string, number | null>>
+}
 type RoomTodo = { id: string; text: string }
 type RoomText = { text: string; revision: number }
 
@@ -59,6 +65,7 @@ type RoomEvent =
       messages: RoomMessage[]
       model: string
       models: RoomModel[]
+      modelRouting?: ModelRouting
       context: RoomText
       dictationPrompt: RoomText
       busy: boolean
@@ -68,6 +75,7 @@ type RoomEvent =
       systemMarks?: RoomMark[]
       todos?: RoomTodo[]
     }
+  | { type: 'model-routing'; model: string; modelRouting: ModelRouting }
   | { type: 'delta'; id: number; text: string }
   | { type: 'presence'; onlineAuthors: string[] }
   | { type: 'todos'; todos: RoomTodo[] }
@@ -122,6 +130,7 @@ export function useRoom() {
   const systemBusy = ref(false)
   const model = ref<string | null>(null)
   const models = ref<RoomModel[]>([])
+  const modelRouting = shallowRef<ModelRouting>()
   const peerSelections = shallowRef<ReadonlyMap<string, RoomSelection>>(
     new Map(),
   )
@@ -246,6 +255,7 @@ export function useRoom() {
         todos.value = event.todos ?? []
         model.value = event.model ?? null
         models.value = event.models ?? []
+        modelRouting.value = event.modelRouting
         context.value = event.context
         if (event.dictationPrompt) dictationPrompt.value = event.dictationPrompt
         busy.value = event.busy
@@ -275,6 +285,9 @@ export function useRoom() {
           })
         status.value = ''
         retryDelay = 1000
+      } else if (event.type === 'model-routing') {
+        model.value = event.model
+        modelRouting.value = event.modelRouting
       } else if (event.type === 'delta') {
         const message = messages.value.find((item) => item.id === event.id)
         if (message && !message.interrupted) message.text += event.text
@@ -321,12 +334,19 @@ export function useRoom() {
     status.value = 'Связь прервалась. Переподключение…'
   }
 
+  function onVisibilityChange() {
+    if (document.visibilityState === 'visible' && connected.value)
+      sendSocket({ type: 'room-visible' })
+  }
+
   onMounted(() => {
+    document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('offline', disconnect)
     window.addEventListener('online', connect)
     connect()
   })
   onUnmounted(() => {
+    document.removeEventListener('visibilitychange', onVisibilityChange)
     window.removeEventListener('offline', disconnect)
     window.removeEventListener('online', connect)
     disconnect()
@@ -361,6 +381,7 @@ export function useRoom() {
     imageBaseUrl: apiUrl ? apiUrl + '/images/' : '',
     model,
     models,
+    modelRouting,
     context,
     dictationPrompt,
     todos,

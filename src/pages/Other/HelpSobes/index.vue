@@ -89,16 +89,37 @@
             :aria-busy="!!pendingModel"
           >
             <legend>Модель</legend>
-            <label v-for="option in models" :key="option.id" class="option">
+            <p v-if="modelRouting" class="model-timing" role="status">
+              Время до первого текста<span v-if="modelRouting.checking">
+                · проверяем…</span
+              ><span v-else-if="modelRouting.checkedAt">
+                · замер {{ checkDate.format(modelRouting.checkedAt) }}</span
+              >
+            </p>
+            <label
+              v-for="option in modelOptions"
+              :key="option.id"
+              class="option"
+            >
               <input
                 type="radio"
                 name="sobes-model"
                 :value="option.id"
                 :disabled="pendingModel !== null && pendingModel !== option.id"
-                :checked="(pendingModel ?? model) === option.id"
+                :checked="(pendingModel ?? modelChoice) === option.id"
                 @change="changeModel(option.id)"
               />
               {{ option.label }}
+              <span
+                v-if="option.id === 'auto' && modelRouting?.mode === 'auto'"
+                class="model-metric"
+                >{{ activeModelLabel }}</span
+              >
+              <span
+                v-else-if="modelRouting && option.id !== 'auto'"
+                class="model-metric"
+                >{{ latencyLabel(option.id) }}</span
+              >
             </label>
           </fieldset>
           <form
@@ -234,6 +255,7 @@ const {
   todos,
   model,
   models,
+  modelRouting,
   busy,
   connected,
   onlineAuthors,
@@ -312,6 +334,32 @@ const hasPersonalDraft = computed(
 const saving = ref<TextKey | null>(null)
 const resetting = ref(false)
 const pendingModel = ref<string | null>(null)
+const modelChoice = computed(() =>
+  modelRouting.value?.mode === 'auto' ? 'auto' : model.value,
+)
+const modelOptions = computed(() =>
+  modelRouting.value
+    ? [{ id: 'auto', label: 'Автовыбор по скорости' }, ...models.value]
+    : models.value,
+)
+const activeModelLabel = computed(
+  () => models.value.find((option) => option.id === model.value)?.label,
+)
+const checkDate = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+const seconds = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 })
+
+function latencyLabel(id: string) {
+  const routing = modelRouting.value
+  const ms = routing?.results[id]
+  if (ms === undefined) return routing?.checking ? 'Проверяем…' : 'Нет замера'
+  if (ms === null) return 'Нет ответа'
+  return ms < 1000 ? `${ms} мс` : `${seconds.format(ms / 1000)} с`
+}
 const error = ref('')
 const settingsBusy = computed(
   () => !!saving.value || resetting.value || !!pendingModel.value,
@@ -477,7 +525,7 @@ async function saveText(key: TextKey) {
 }
 
 async function changeModel(id: string) {
-  if (!connected.value || settingsBusy.value || id === model.value) return
+  if (!connected.value || settingsBusy.value || id === modelChoice.value) return
   pendingModel.value = id
   error.value = ''
   try {
@@ -671,6 +719,18 @@ dialog {
 
 .theme-options {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.model-timing,
+.model-metric {
+  color: var(--room-muted);
+  font-size: $size-comment;
+}
+
+.model-metric {
+  font-variant-numeric: tabular-nums;
+  margin-inline-start: auto;
+  text-align: end;
 }
 
 .option {
