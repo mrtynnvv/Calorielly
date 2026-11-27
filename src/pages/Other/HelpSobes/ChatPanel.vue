@@ -115,20 +115,21 @@
           >Подготовка изображения…</span
         >
       </div>
-      <form @submit.prevent="submit">
+      <form @submit.prevent="submit()">
         <textarea
           ref="input"
           v-model="draft"
           rows="1"
           :placeholder="placeholder"
           :aria-label="placeholder"
+          @beforeinput="input && recordedDraft?.beforeEdit(input)"
+          @input="input && recordedDraft?.edited(input)"
           @keydown.enter="handleEnter"
-          @compositionstart="composing = true"
+          @compositionstart="beginComposition"
           @compositionend="endComposition"
         />
         <button
           v-if="channel !== 'chat' && transcribe"
-          ref="dictationButton"
           type="button"
           class="microphone"
           :class="{
@@ -136,10 +137,9 @@
             'choose-source': needsSource,
           }"
           :aria-label="dictationLabel"
-          :title="
-            channel === 'system'
-              ? dictationLabel + ' (⌥ + X / Ч)'
-              : dictationLabel
+          :title="channel === 'system' ? undefined : dictationLabel"
+          :aria-describedby="
+            channel === 'system' ? 'sobes-system-shortcut-hint' : undefined
           "
           :aria-keyshortcuts="channel === 'system' ? 'Alt+X' : undefined"
           :aria-pressed="phase === 'recording' || phase === 'starting'"
@@ -148,9 +148,7 @@
             phase === 'starting' ||
             phase === 'finishing'
           "
-          :disabled="
-            sending || phase === 'finishing' || (!connected && phase === 'idle')
-          "
+          :disabled="recordingDisabled"
           @mousedown.prevent
           @click="toggleRecording(true)"
         >
@@ -192,6 +190,19 @@
           </svg>
           <span v-if="needsSource">Выбрать источник</span>
         </button>
+        <span
+          v-if="channel === 'system' && transcribe"
+          id="sobes-system-shortcut-hint"
+          role="tooltip"
+          class="shortcut-hint"
+        >
+          <strong>⌥ Option + X / Ч</strong>
+          <span v-if="needsSource">Сначала выбери источник звука.</span>
+          Нажми, чтобы начать запись. Нажми ещё раз, чтобы остановить её и
+          отправить вопрос. Пока идёт распознавание, повторное нажатие отменит
+          этот вопрос и начнёт новую запись.
+          <span>Щелчок по кнопке остановки оставит текст в черновике.</span>
+        </span>
         <UiButton
           type="submit"
           text="Отправить"
@@ -212,6 +223,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import AssistantReply from './AssistantReply.vue'
 import AuthorLabel from './AuthorLabel.vue'
+import { createDictationDraft } from './dictationDraft'
 import { useDictation, type Transcribe } from './useDictation'
 import { usePastedImages } from './usePastedImages'
 import type { Channel, RoomMessage, RoomSelection } from './useRoom'
@@ -257,13 +269,20 @@ if (props.channel !== 'chat')
     props.channel,
   )
 const input = ref<HTMLTextAreaElement | null>(null)
-const dictationButton = ref<HTMLButtonElement | null>(null)
 const draft = ref('')
-let composing = false
+let recordedDraft: ReturnType<typeof createDictationDraft> | undefined
+let composition: Promise<void> | undefined
+let resolveComposition: (() => void) | undefined
 let afterComposition = ''
 
+function beginComposition() {
+  composition ??= new Promise<void>((resolve) => {
+    resolveComposition = resolve
+  })
+}
+
 function appendPhrase(text: string) {
-  if (composing) {
+  if (composition) {
     afterComposition += (afterComposition ? ' ' : '') + text
     return
   }
@@ -275,13 +294,16 @@ function appendPhrase(text: string) {
   field.setRangeText(separator + text, end, end, 'preserve')
   if (field.selectionDirection !== selectionDirection)
     field.setSelectionRange(selectionStart, selectionEnd, selectionDirection)
+  recordedDraft?.appended(field.value, end)
   draft.value = field.value
 }
 
 function endComposition() {
-  composing = false
+  composition = undefined
   if (afterComposition) appendPhrase(afterComposition)
   afterComposition = ''
+  resolveComposition?.()
+  resolveComposition = undefined
 }
 
 const {
@@ -301,6 +323,21 @@ const needsSource = computed(
   () =>
     props.channel === 'system' && !displayReady.value && phase.value === 'idle',
 )
+const submission = ref<{ awaitingRecording: boolean; posting: boolean }>()
+const sending = computed(() => !!submission.value)
+const canRestart = computed(
+  () =>
+    props.channel === 'system' &&
+    displayReady.value &&
+    props.connected &&
+    !submission.value?.posting &&
+    (phase.value === 'finishing' || submission.value?.awaitingRecording),
+)
+const recordingDisabled = computed(
+  () =>
+    (!canRestart.value && (sending.value || phase.value === 'finishing')) ||
+    (!props.connected && phase.value === 'idle'),
+)
 const dictationLabel = computed(
   () =>
     ({
@@ -318,17 +355,34 @@ const dictationLabel = computed(
         props.channel === 'system'
           ? 'Остановить распознавание звука компьютера'
           : 'Остановить диктовку',
-      finishing: 'Завершается распознавание',
+      finishing: canRestart.value
+        ? 'Прервать распознавание и начать новую запись'
+        : 'Завершается распознавание',
     })[phase.value],
 )
 
-function toggleRecording(focusInput: boolean) {
+async function toggleRecording(fromButton: boolean) {
   sendError.value = ''
   if (needsSource.value) {
-    void selectDisplay()
-  } else if (phase.value === 'idle') {
-    if (focusInput) input.value?.focus({ preventScroll: true })
+    const ready = await selectDisplay()
+    if (!ready || fromButton || props.collapsed || !props.connected) return
+  }
+  if (canRestart.value) {
+    submission.value = undefined
+    cancel()
+    afterComposition = ''
+    if (input.value && recordedDraft) {
+      recordedDraft.rollback(input.value)
+      draft.value = input.value.value
+    }
+  }
+  if (phase.value === 'idle') {
+    if (props.channel === 'system')
+      recordedDraft = createDictationDraft(input.value?.value ?? draft.value)
+    if (fromButton) input.value?.focus({ preventScroll: true })
     void start()
+  } else if (!fromButton && phase.value === 'recording' && !props.disabled) {
+    void submit(true)
   } else void finish()
 }
 
@@ -347,15 +401,21 @@ if (props.channel === 'system') {
     )
       return
     event.preventDefault()
-    if (
-      !event.repeat &&
-      dictationButton.value &&
-      !dictationButton.value.disabled
-    )
-      toggleRecording(false)
+    if (!event.repeat && !recordingDisabled.value) void toggleRecording(false)
   }
-  onMounted(() => window.addEventListener('keydown', onAudioShortcut))
-  onUnmounted(() => window.removeEventListener('keydown', onAudioShortcut))
+  function leave() {
+    submission.value = undefined
+    if (composition) endComposition()
+  }
+  onMounted(() => {
+    window.addEventListener('keydown', onAudioShortcut)
+    window.addEventListener('pagehide', leave)
+  })
+  onUnmounted(() => {
+    window.removeEventListener('keydown', onAudioShortcut)
+    window.removeEventListener('pagehide', leave)
+    leave()
+  })
 }
 
 watch(
@@ -375,7 +435,6 @@ watch(
   },
 )
 
-const sending = ref(false)
 const sendError = ref('')
 const { images, preparing, paste, discard, finishPreparing } =
   usePastedImages(sendError)
@@ -419,9 +478,13 @@ watch(
   { flush: 'post' },
 )
 
-async function submit() {
+async function submit(onlyWithSpeech = false) {
   if (props.disabled || sending.value) return
-  sending.value = true
+  submission.value = {
+    awaitingRecording: phase.value !== 'idle',
+    posting: false,
+  }
+  const job = submission.value
   sendError.value = ''
   followLatest = true
   try {
@@ -430,6 +493,10 @@ async function submit() {
       !preparing.value || finishPreparing(),
     ])
     if (!dictationReady || !imagesReady) return
+    if (onlyWithSpeech && composition) await composition
+    if (submission.value !== job) return
+    if (onlyWithSpeech && (!recordedDraft?.hasTranscript() || props.collapsed))
+      return
     const original = draft.value
     const text = original.trim()
     const attachments = images.value
@@ -438,18 +505,24 @@ async function submit() {
       sendError.value = 'Сообщение может содержать до 8000 символов.'
       return
     }
+    job.posting = true
     await props.send(
       props.channel,
       text,
       attachments.map((image) => image.file),
     )
+    if (submission.value !== job) return
     if (draft.value === original) draft.value = ''
+    recordedDraft = undefined
     discard(attachments)
   } catch (error) {
-    sendError.value =
-      error instanceof Error ? error.message : 'Не удалось отправить сообщение.'
+    if (submission.value === job)
+      sendError.value =
+        error instanceof Error
+          ? error.message
+          : 'Не удалось отправить сообщение.'
   } finally {
-    sending.value = false
+    if (submission.value === job) submission.value = undefined
   }
 }
 
@@ -492,6 +565,48 @@ form {
   align-items: center;
   display: flex;
   gap: 6px;
+}
+
+form {
+  position: relative;
+}
+
+.shortcut-hint {
+  background: var(--room-raised);
+  border: 1px solid var(--room-field-border);
+  border-radius: 8px;
+  bottom: calc(100% + 4px);
+  color: var(--room-text);
+  font-size: $size-comment;
+  inset-inline-end: 0;
+  line-height: 1.4;
+  padding: 6px 9px;
+  position: absolute;
+  visibility: hidden;
+  width: min(100%, 300px);
+  z-index: 1;
+
+  strong,
+  span {
+    display: block;
+  }
+
+  span {
+    color: var(--room-muted);
+  }
+
+  &::after {
+    content: '';
+    height: 5px;
+    inset: 100% 0 auto;
+    position: absolute;
+  }
+
+  .microphone:hover + &,
+  .microphone:focus-visible + &,
+  &:hover {
+    visibility: visible;
+  }
 }
 
 header {

@@ -122,6 +122,7 @@ export function useDictation(
         track.enabled = false
         track.addEventListener('ended', displayEnded)
       }
+      return true
     } catch (reason) {
       if (selection !== request) return
       releaseDisplay()
